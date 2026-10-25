@@ -490,7 +490,7 @@ export default function NoteModal({
                 background: '#000000'
               }}>
                 <img
-                  src={note.image_path}
+                  src={api.getImageUrl(note.image_path)}
                   alt="Original Photo"
                   style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '6px' }}
                 />

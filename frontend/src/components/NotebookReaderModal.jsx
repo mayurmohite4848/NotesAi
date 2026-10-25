@@ -724,7 +724,7 @@ export default function NotebookReaderModal({
                 background: '#000000'
               }}>
                 <img 
-                  src={activePage.image_path}
+                  src={api.getImageUrl(activePage.image_path)}
                   alt={`Original Page ${activePage.page_number}`}
                   style={{
                     maxWidth: '100%',

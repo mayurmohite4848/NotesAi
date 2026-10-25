@@ -14,6 +14,15 @@ async function request(url, options = {}) {
 }
 
 export const api = {
+  // Image URL resolver for local proxy or production backend
+  getImageUrl(path) {
+    if (!path) return '';
+    if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('data:')) {
+      return path;
+    }
+    return `${API_BASE}${path}`;
+  },
+
   // Check API status
   async checkHealth() {
     return request('/api/health');

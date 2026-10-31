@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Sparkles, Key, FileText, Check, X, RefreshCw, AlertCircle, Loader2, BookOpen, Layers, Globe, Activity, Zap } from 'lucide-react';
+import { Sparkles, Key, FileText, Check, X, RefreshCw, AlertCircle, Loader2, BookOpen, Layers, Globe, Activity, Zap, User } from 'lucide-react';
 import { api } from '../services/api';
 
 export default function Navbar({ 
@@ -12,6 +12,9 @@ export default function Navbar({
   onOpenTelemetry,
   onSeedDemo,
   seedingDemo = false,
+  currentUser = null,
+  onOpenAuth,
+  onSignOut,
   activeTab = 'notes', // 'notes' | 'notebooks'
   onChangeTab,
   stats, 
@@ -302,6 +305,54 @@ export default function Navbar({
             <Key size={13} color={hasKey ? '#34d399' : 'currentColor'} />
             <span>{hasKey ? 'Key Active' : 'API Key'}</span>
           </button>
+
+          {currentUser ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div 
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: 'rgba(99, 102, 241, 0.15)',
+                  border: '1px solid rgba(99, 102, 241, 0.4)',
+                  borderRadius: '20px',
+                  padding: '3px 9px',
+                  fontSize: '0.78rem',
+                  color: '#e0e7ff'
+                }}
+                title={`Signed in as ${currentUser.email}`}
+              >
+                <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#34d399' }} />
+                <span>{currentUser.email?.split('@')[0]}</span>
+              </div>
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={onSignOut}
+                style={{ fontSize: '0.75rem', padding: '4px 7px', color: 'var(--text-dim)' }}
+                title="Sign out of Supabase"
+              >
+                Sign Out
+              </button>
+            </div>
+          ) : (
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={onOpenAuth}
+              style={{
+                background: 'rgba(255, 255, 255, 0.05)',
+                borderColor: 'rgba(255, 255, 255, 0.15)',
+                whiteSpace: 'nowrap',
+                padding: '6px 11px',
+                fontSize: '0.8rem',
+                gap: '5px',
+                color: '#e2e8f0'
+              }}
+              title="Sign in for personal cloud sync & isolated library"
+            >
+              <User size={13} color="#818cf8" />
+              <span>Sign In</span>
+            </button>
+          )}
 
           {onRefresh && (
             <button

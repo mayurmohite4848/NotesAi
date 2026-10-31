@@ -1,10 +1,21 @@
+import { getSessionToken } from './supabase';
+
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
 /**
- * Helper to handle fetch responses and error reporting
+ * Helper to handle fetch responses, Supabase JWT auth injection, and error reporting
  */
 async function request(url, options = {}) {
-  const response = await fetch(`${API_BASE}${url}`, options);
+  const token = await getSessionToken();
+  const headers = { ...(options.headers || {}) };
+  if (token && !headers['Authorization']) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_BASE}${url}`, {
+    ...options,
+    headers
+  });
   const data = await response.json().catch(() => ({}));
   
   if (!response.ok) {

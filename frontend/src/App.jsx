@@ -28,8 +28,10 @@ import NotebookBatchUploader from './components/NotebookBatchUploader';
 import NotebookReaderModal from './components/NotebookReaderModal';
 import GlobalWorkspaceChatModal from './components/GlobalWorkspaceChatModal';
 import LLMOpsModal from './components/LLMOpsModal';
+import AuthModal from './components/AuthModal';
 import Toast from './components/Toast';
 import { api } from './services/api';
+import { supabase } from './services/supabase';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('notes'); // 'notes' | 'notebooks'
@@ -66,9 +68,39 @@ export default function App() {
   const [activeNotebookInitialPage, setActiveNotebookInitialPage] = useState(0);
   const [showGlobalChat, setShowGlobalChat] = useState(false);
   const [showTelemetryModal, setShowTelemetryModal] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
 
   // Toast notifications
   const [toasts, setToasts] = useState([]);
+
+  // Supabase Auth State Listener
+  useEffect(() => {
+    if (supabase) {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        setCurrentUser(session?.user || null);
+      });
+
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        setCurrentUser(session?.user || null);
+      });
+
+      return () => subscription?.unsubscribe();
+    }
+  }, []);
+
+  const handleSignOut = async () => {
+    if (supabase) {
+      try {
+        await supabase.auth.signOut();
+        setCurrentUser(null);
+        addToast('Signed out of cloud account. Now in Guest Mode.', 'info');
+        loadData(true);
+      } catch (err) {
+        console.error('Sign out error:', err);
+      }
+    }
+  };
 
   // Global Keyboard Shortcuts (Ctrl+K or Cmd+K for Global AI Hub)
   useEffect(() => {
@@ -269,6 +301,9 @@ export default function App() {
         onOpenTelemetry={() => setShowTelemetryModal(true)}
         onSeedDemo={handleSeedDemoSamples}
         seedingDemo={seedingDemo}
+        currentUser={currentUser}
+        onOpenAuth={() => setShowAuthModal(true)}
+        onSignOut={handleSignOut}
         stats={stats}
         onRefresh={() => loadData(true)}
         refreshing={refreshing}
@@ -732,6 +767,17 @@ export default function App() {
           showToast={addToast}
         />
       )}
+
+      {/* Supabase Cloud Authentication Modal */}
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        onAuthSuccess={(user) => {
+          setCurrentUser(user);
+          loadData(true);
+        }}
+        showToast={addToast}
+      />
     </div>
   );
 }

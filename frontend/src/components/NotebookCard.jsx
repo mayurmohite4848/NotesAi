@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   BookOpen, 
   FileText, 
@@ -7,11 +7,13 @@ import {
   Calendar, 
   Layers, 
   Sparkles,
-  ArrowRight
+  ArrowRight,
+  Loader2
 } from 'lucide-react';
 import { api } from '../services/api';
 
 export default function NotebookCard({ notebook, onOpen, onDelete, showToast }) {
+  const [downloading, setDownloading] = useState(false);
   const pageCount = notebook.page_count || 0;
   const coverColor = notebook.cover_color || '#6366f1';
 
@@ -25,16 +27,30 @@ export default function NotebookCard({ notebook, onOpen, onDelete, showToast }) 
     });
   };
 
-  const handleDownloadPdf = (e) => {
+  const handleDownloadPdf = async (e) => {
     e.stopPropagation();
-    window.open(api.getExportPdfUrl(notebook.id), '_blank');
-    if (showToast) showToast('Generating PDF download...', 'info');
+    setDownloading(true);
+    try {
+      if (showToast) showToast('Compiling printable PDF with ReportLab...', 'info');
+      const filename = await api.downloadNotebookPdf(notebook.id, notebook.title);
+      if (showToast) showToast(`Downloaded ${filename}!`, 'success');
+    } catch (err) {
+      console.error('NotebookCard download error:', err);
+      if (showToast) showToast(err.message || 'Failed to download PDF.', 'error');
+    } finally {
+      setDownloading(false);
+    }
   };
 
-  const handleDownloadMd = (e) => {
+  const handleDownloadMd = async (e) => {
     e.stopPropagation();
-    window.open(api.getExportMdUrl(notebook.id), '_blank');
-    if (showToast) showToast('Downloading Markdown bundle...', 'info');
+    try {
+      const filename = await api.downloadNotebookMd(notebook.id, notebook.title);
+      if (showToast) showToast(`Downloaded ${filename}!`, 'success');
+    } catch (err) {
+      console.error('NotebookCard MD download error:', err);
+      if (showToast) showToast(err.message || 'Failed to download Markdown.', 'error');
+    }
   };
 
   return (
@@ -140,10 +156,11 @@ export default function NotebookCard({ notebook, onOpen, onDelete, showToast }) 
             <button
               className="btn btn-ghost btn-icon"
               onClick={handleDownloadPdf}
+              disabled={downloading}
               title="Download PDF document"
               style={{ color: '#818cf8', padding: '5px' }}
             >
-              <Download size={15} />
+              {downloading ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
             </button>
 
             <button

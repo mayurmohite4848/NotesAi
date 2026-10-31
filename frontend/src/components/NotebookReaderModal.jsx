@@ -43,6 +43,8 @@ export default function NotebookReaderModal({
   const [activePageIndex, setActivePageIndex] = useState(initialPageIndex || 0);
   const [savingPage, setSavingPage] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [downloadingMd, setDownloadingMd] = useState(false);
   const [relatedNotebooks, setRelatedNotebooks] = useState([]);
   const [citationFlash, setCitationFlash] = useState(initialPageIndex !== 0);
 
@@ -213,6 +215,33 @@ export default function NotebookReaderModal({
     setCopied(true);
     if (showToast) showToast('Page text copied to clipboard!', 'info');
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleDownloadPdf = async () => {
+    setDownloadingPdf(true);
+    try {
+      if (showToast) showToast('Compiling full notebook PDF with ReportLab...', 'info');
+      const filename = await api.downloadNotebookPdf(notebook.id, notebook.title);
+      if (showToast) showToast(`Downloaded ${filename}!`, 'success');
+    } catch (err) {
+      console.error('Download notebook PDF error:', err);
+      if (showToast) showToast(err.message || 'Failed to download notebook PDF.', 'error');
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
+
+  const handleDownloadMd = async () => {
+    setDownloadingMd(true);
+    try {
+      const filename = await api.downloadNotebookMd(notebook.id, notebook.title);
+      if (showToast) showToast(`Downloaded ${filename}!`, 'success');
+    } catch (err) {
+      console.error('Download notebook MD error:', err);
+      if (showToast) showToast(err.message || 'Failed to download Markdown.', 'error');
+    } finally {
+      setDownloadingMd(false);
+    }
   };
 
   if (loading) {
@@ -441,21 +470,24 @@ export default function NotebookReaderModal({
 
             <button
               className="btn btn-secondary btn-sm"
-              onClick={() => window.open(api.getExportPdfUrl(notebook.id), '_blank')}
+              onClick={handleDownloadPdf}
+              disabled={downloadingPdf}
               title="Download full notebook as PDF document"
-              style={{ color: '#818cf8' }}
+              style={{ color: '#818cf8', gap: '5px' }}
             >
-              <Download size={14} />
-              <span>PDF</span>
+              {downloadingPdf ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+              <span>{downloadingPdf ? 'Exporting...' : 'PDF'}</span>
             </button>
 
             <button
               className="btn btn-secondary btn-sm"
-              onClick={() => window.open(api.getExportMdUrl(notebook.id), '_blank')}
+              onClick={handleDownloadMd}
+              disabled={downloadingMd}
               title="Download full notebook as Markdown"
+              style={{ gap: '5px' }}
             >
-              <FileText size={14} />
-              <span>.MD</span>
+              {downloadingMd ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
+              <span>{downloadingMd ? 'Exporting...' : '.MD'}</span>
             </button>
 
             <button

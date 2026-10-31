@@ -1,3 +1,4 @@
+import React, { useState } from 'react';
 import { 
   Star, 
   Trash2, 
@@ -6,11 +7,12 @@ import {
   FileText, 
   Sparkles, 
   Image as ImageIcon,
-  Download
+  Download,
+  Loader2
 } from 'lucide-react';
 import { api } from '../services/api';
 
-export default function NoteCard({ note, onClick, onSelect, onToggleFavorite, onDelete }) {
+export default function NoteCard({ note, onClick, onSelect, onToggleFavorite, onDelete, showToast }) {
   const isFav = !!note.is_favorite;
 
   const formatDate = (dateStr) => {
@@ -26,6 +28,23 @@ export default function NoteCard({ note, onClick, onSelect, onToggleFavorite, on
   const handleCardClick = () => {
     if (onClick) onClick(note);
     else if (onSelect) onSelect(note);
+  };
+
+  const [downloading, setDownloading] = useState(false);
+
+  const handleDownloadPdf = async (e) => {
+    e.stopPropagation();
+    setDownloading(true);
+    try {
+      if (showToast) showToast('Compiling printable PDF with ReportLab...', 'info');
+      const filename = await api.downloadNotePdf(note.id, note.title);
+      if (showToast) showToast(`Downloaded ${filename}!`, 'success');
+    } catch (err) {
+      console.error('NoteCard download error:', err);
+      if (showToast) showToast(err.message || 'Failed to download PDF.', 'error');
+    } finally {
+      setDownloading(false);
+    }
   };
 
   return (
@@ -146,13 +165,11 @@ export default function NoteCard({ note, onClick, onSelect, onToggleFavorite, on
             <button
               className="btn btn-ghost btn-icon"
               style={{ color: '#818cf8', padding: '4px' }}
-              onClick={(e) => {
-                e.stopPropagation();
-                window.open(api.getNoteExportPdfUrl(note.id), '_blank');
-              }}
+              onClick={handleDownloadPdf}
+              disabled={downloading}
               title="Download Note PDF"
             >
-              <Download size={14} />
+              {downloading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
             </button>
 
             <button

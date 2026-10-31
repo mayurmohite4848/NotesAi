@@ -16,7 +16,8 @@ import {
   Eye,
   Edit3,
   Code2,
-  Download
+  Download,
+  Loader2
 } from 'lucide-react';
 import { api } from '../services/api';
 import NoteContentRenderer from './NoteContentRenderer';
@@ -47,6 +48,35 @@ export default function NoteModal({
   const [isFavorite, setIsFavorite] = useState(!!initialNote?.is_favorite);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [downloadingMd, setDownloadingMd] = useState(false);
+
+  const handleDownloadPdf = async () => {
+    setDownloadingPdf(true);
+    try {
+      if (showToast) showToast('Compiling printable PDF with ReportLab...', 'info');
+      const filename = await api.downloadNotePdf(targetNoteId, title);
+      if (showToast) showToast(`Downloaded ${filename}!`, 'success');
+    } catch (err) {
+      console.error('Download PDF error:', err);
+      if (showToast) showToast(err.message || 'Failed to download PDF.', 'error');
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
+
+  const handleDownloadMd = async () => {
+    setDownloadingMd(true);
+    try {
+      const filename = await api.downloadNoteMd(targetNoteId, title);
+      if (showToast) showToast(`Downloaded ${filename}!`, 'success');
+    } catch (err) {
+      console.error('Download MD error:', err);
+      if (showToast) showToast(err.message || 'Failed to download Markdown.', 'error');
+    } finally {
+      setDownloadingMd(false);
+    }
+  };
 
   useEffect(() => {
     if (targetNoteId) {
@@ -308,21 +338,24 @@ export default function NoteModal({
 
             <button
               className="btn btn-secondary btn-sm"
-              onClick={() => window.open(api.getNoteExportPdfUrl(targetNoteId), '_blank')}
+              onClick={handleDownloadPdf}
+              disabled={downloadingPdf}
               title="Download Note as PDF document"
-              style={{ color: '#818cf8' }}
+              style={{ color: '#818cf8', gap: '5px' }}
             >
-              <Download size={14} />
-              <span>PDF</span>
+              {downloadingPdf ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+              <span>{downloadingPdf ? 'Exporting...' : 'PDF'}</span>
             </button>
 
             <button
               className="btn btn-secondary btn-sm"
-              onClick={() => window.open(api.getNoteExportMdUrl(targetNoteId), '_blank')}
+              onClick={handleDownloadMd}
+              disabled={downloadingMd}
               title="Download Note as Markdown"
+              style={{ gap: '5px' }}
             >
-              <FileText size={14} />
-              <span>.MD</span>
+              {downloadingMd ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
+              <span>{downloadingMd ? 'Exporting...' : '.MD'}</span>
             </button>
 
             <button

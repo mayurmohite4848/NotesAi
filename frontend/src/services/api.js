@@ -257,6 +257,58 @@ export const api = {
     return `${API_BASE}/api/notebooks/${notebookId}/export-md`;
   },
 
+  /**
+   * Universal Blob File Downloader
+   * Bypasses browser popup blockers by streaming via fetch and triggering direct anchor download.
+   */
+  async downloadBlob(url, defaultFilename = 'document') {
+    const fullUrl = `${API_BASE}${url.startsWith('/') ? url : `/${url}`}`;
+    const response = await fetch(fullUrl);
+    if (!response.ok) {
+      throw new Error(`Download failed: HTTP ${response.status}`);
+    }
+
+    let filename = defaultFilename;
+    const disposition = response.headers.get('Content-Disposition') || response.headers.get('content-disposition');
+    if (disposition && disposition.includes('filename=')) {
+      const match = disposition.match(/filename=["']?([^"';]+)["']?/i);
+      if (match && match[1]) {
+        filename = match[1].trim();
+      }
+    }
+
+    const blob = await response.blob();
+    const blobUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000);
+    return filename;
+  },
+
+  async downloadNotePdf(noteId, title = 'note') {
+    const clean = (title || 'note').toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+    return this.downloadBlob(`/api/notes/${noteId}/export-pdf`, `${clean}.pdf`);
+  },
+
+  async downloadNoteMd(noteId, title = 'note') {
+    const clean = (title || 'note').toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+    return this.downloadBlob(`/api/notes/${noteId}/export-md`, `${clean}.md`);
+  },
+
+  async downloadNotebookPdf(notebookId, title = 'notebook') {
+    const clean = (title || 'notebook').toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+    return this.downloadBlob(`/api/notebooks/${notebookId}/export-pdf`, `${clean}.pdf`);
+  },
+
+  async downloadNotebookMd(notebookId, title = 'notebook') {
+    const clean = (title || 'notebook').toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+    return this.downloadBlob(`/api/notebooks/${notebookId}/export-md`, `${clean}.md`);
+  },
+
   // Grounded RAG Notebook Chat API
   async chatWithNotebook(notebookId, message, { currentPage = null, scope = 'all_pages' } = {}) {
     const apiKey = (localStorage.getItem('gemini_api_key') || '').trim();

@@ -145,5 +145,32 @@ class TestFlaskNoteApi(unittest.TestCase):
         get_after_del = self.client.get(f"/api/notes/{note_id}")
         self.assertEqual(get_after_del.status_code, 404)
 
+    def test_export_note_pdf_and_markdown(self):
+        create_res = self.client.post("/api/notes", json={
+            "title": "Quantum Physics & Equations",
+            "content": "# Principles\n- Superposition\n- Entanglement\n**Formula:** E = mc^2",
+            "tags": ["physics", "quantum"],
+            "ai_insights": "Core takeaway: Wave-particle duality underpins modern quantum state spaces."
+        })
+        self.assertEqual(create_res.status_code, 201)
+        note_id = create_res.get_json()["note"]["id"]
+
+        # Test PDF export
+        pdf_res = self.client.get(f"/api/notes/{note_id}/export-pdf")
+        self.assertEqual(pdf_res.status_code, 200)
+        self.assertEqual(pdf_res.content_type, "application/pdf")
+        self.assertTrue(pdf_res.data.startswith(b"%PDF"))
+        self.assertTrue(len(pdf_res.data) > 500)
+
+        # Test Markdown export
+        md_res = self.client.get(f"/api/notes/{note_id}/export-md")
+        self.assertEqual(md_res.status_code, 200)
+        self.assertEqual(md_res.content_type, "text/markdown; charset=utf-8")
+        md_text = md_res.data.decode("utf-8")
+        self.assertIn("# Quantum Physics & Equations", md_text)
+        self.assertIn("#physics", md_text)
+        self.assertIn("Superposition", md_text)
+
 if __name__ == "__main__":
     unittest.main()
+

@@ -2,7 +2,9 @@ import os
 import json
 import urllib.request
 import urllib.error
-from flask import Blueprint, request, jsonify, current_app
+import io
+from flask import Blueprint, request, jsonify, current_app, send_file, Response
+from werkzeug.utils import secure_filename
 from backend.db import (
     get_all_notes,
     get_note_by_id,
@@ -14,6 +16,7 @@ from backend.db import (
 )
 from backend.services.image_processor import process_and_save_image, generate_minimal_ai_enhancements
 from backend.services.ocr_service import CANDIDATE_GEMINI_MODELS
+from backend.services.pdf_service import generate_single_note_pdf, generate_single_note_markdown
 
 notes_bp = Blueprint("notes_bp", __name__)
 
@@ -272,6 +275,40 @@ def remove_note(note_id):
         "message": "Note deleted successfully.",
         "id": note_id
     }), 200
+
+@notes_bp.route("/api/notes/<int:note_id>/export-pdf", methods=["GET"])
+def export_note_pdf(note_id):
+    """Builds and streams a clean printable PDF document for a single note."""
+    note = get_note_by_id(note_id)
+    if not note:
+        return jsonify({"error": "Note not found."}), 404
+
+    pdf_buffer = io.BytesIO()
+    generate_single_note_pdf(note, pdf_buffer)
+    pdf_buffer.seek(0)
+
+    clean_filename = secure_filename(note.get("title", "note")).lower() or "note"
+    return send_file(
+        pdf_buffer,
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name=f"{clean_filename}.pdf"
+    )
+
+@notes_bp.route("/api/notes/<int:note_id>/export-md", methods=["GET"])
+def export_note_markdown(note_id):
+    """Streams a formatted Markdown document for a single note."""
+    note = get_note_by_id(note_id)
+    if not note:
+        return jsonify({"error": "Note not found."}), 404
+
+    md_content = generate_single_note_markdown(note)
+    clean_filename = secure_filename(note.get("title", "note")).lower() or "note"
+    return Response(
+        md_content,
+        mimetype="text/markdown",
+        headers={"Content-Disposition": f"attachment; filename={clean_filename}.md"}
+    )
 
 @notes_bp.route("/api/upload", methods=["POST"])
 def upload_image_and_process():

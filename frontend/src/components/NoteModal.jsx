@@ -15,7 +15,8 @@ import {
   Columns2,
   Eye,
   Edit3,
-  Code2
+  Code2,
+  Download
 } from 'lucide-react';
 import { api } from '../services/api';
 import NoteContentRenderer from './NoteContentRenderer';
@@ -23,6 +24,7 @@ import NoteContentRenderer from './NoteContentRenderer';
 export default function NoteModal({ 
   note: initialNote, 
   noteId, 
+  fromCitation = false,
   onClose, 
   onNoteUpdated, 
   onDeleteNote, 
@@ -305,6 +307,25 @@ export default function NoteModal({
             </button>
 
             <button
+              className="btn btn-secondary btn-sm"
+              onClick={() => window.open(api.getNoteExportPdfUrl(targetNoteId), '_blank')}
+              title="Download Note as PDF document"
+              style={{ color: '#818cf8' }}
+            >
+              <Download size={14} />
+              <span>PDF</span>
+            </button>
+
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={() => window.open(api.getNoteExportMdUrl(targetNoteId), '_blank')}
+              title="Download Note as Markdown"
+            >
+              <FileText size={14} />
+              <span>.MD</span>
+            </button>
+
+            <button
               className="btn btn-primary btn-sm"
               onClick={handleSave}
               disabled={saving}
@@ -330,6 +351,24 @@ export default function NoteModal({
             </button>
           </div>
         </div>
+
+        {/* Grounded Citation Source Notification Banner */}
+        {fromCitation && (
+          <div style={{
+            background: 'linear-gradient(90deg, rgba(99, 102, 241, 0.22) 0%, rgba(6, 182, 212, 0.22) 100%)',
+            borderBottom: '1px solid rgba(99, 102, 241, 0.45)',
+            padding: '7px 20px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            fontSize: '0.78rem',
+            color: '#c7d2fe',
+            fontWeight: 600
+          }}>
+            <Sparkles size={14} color="#67e8f9" />
+            <span>📍 Referenced Source Document: Retrievable & grounded via Federated AI Hub</span>
+          </div>
+        )}
 
         {/* Main Body: Dynamic Layout Switcher */}
         <div style={{

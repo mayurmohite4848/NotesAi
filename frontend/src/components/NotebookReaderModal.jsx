@@ -44,6 +44,15 @@ export default function NotebookReaderModal({
   const [savingPage, setSavingPage] = useState(false);
   const [copied, setCopied] = useState(false);
   const [relatedNotebooks, setRelatedNotebooks] = useState([]);
+  const [citationFlash, setCitationFlash] = useState(initialPageIndex !== 0);
+
+  useEffect(() => {
+    if (initialPageIndex !== 0) {
+      setCitationFlash(true);
+      const timer = setTimeout(() => setCitationFlash(false), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [initialPageIndex]);
 
   // 3-Way View Layout: 'split' | 'notes' | 'photo'
   const [viewLayout, setViewLayout] = useState('split');
@@ -463,6 +472,40 @@ export default function NotebookReaderModal({
             </button>
           </div>
         </div>
+
+        {/* Grounded Citation Navigation Flash Banner */}
+        {citationFlash && (
+          <div style={{
+            background: 'linear-gradient(90deg, rgba(99, 102, 241, 0.25) 0%, rgba(6, 182, 212, 0.25) 100%)',
+            borderBottom: '1px solid rgba(99, 102, 241, 0.5)',
+            padding: '7px 24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '10px',
+            fontSize: '0.8rem',
+            color: '#c7d2fe',
+            fontWeight: 600
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Sparkles size={14} color="#67e8f9" />
+              <span>📍 Navigated from Grounded RAG Citation &bull; Active Source: Page {activePageIndex + 1}</span>
+            </div>
+            <button
+              onClick={() => setCitationFlash(false)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'var(--text-dim)',
+                cursor: 'pointer',
+                padding: '2px'
+              }}
+              title="Dismiss citation indicator"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        )}
 
         {/* Semantic Cross-Notebook Links Banner (if related notebooks exist) */}
         {relatedNotebooks && relatedNotebooks.length > 0 && (

@@ -88,6 +88,14 @@ export const api = {
     });
   },
 
+  getNoteExportPdfUrl(noteId) {
+    return `${API_BASE}/api/notes/${noteId}/export-pdf`;
+  },
+
+  getNoteExportMdUrl(noteId) {
+    return `${API_BASE}/api/notes/${noteId}/export-md`;
+  },
+
   async enhanceNoteAI(id) {
     return request(`/api/notes/${id}/enhance-ai`, {
       method: 'POST'

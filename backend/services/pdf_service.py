@@ -224,3 +224,152 @@ def generate_notebook_markdown(notebook):
         lines.append("\n---\n")
 
     return "\n".join(lines)
+
+
+def generate_single_note_pdf(note, output_stream):
+    """
+    Generates a beautifully styled, printable PDF document for a single note using ReportLab.
+    """
+    doc = SimpleDocTemplate(
+        output_stream,
+        pagesize=letter,
+        rightMargin=40,
+        leftMargin=40,
+        topMargin=40,
+        bottomMargin=40
+    )
+
+    styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle(
+        'NoteTitle',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=22,
+        leading=26,
+        textColor=colors.HexColor('#1e1b4b'),
+        spaceAfter=10
+    )
+
+    subtitle_style = ParagraphStyle(
+        'NoteSubtitle',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=10,
+        leading=14,
+        textColor=colors.HexColor('#6366f1'),
+        spaceAfter=16
+    )
+
+    body_style = ParagraphStyle(
+        'NoteBody',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=10,
+        leading=15,
+        textColor=colors.HexColor('#334155'),
+        spaceAfter=8
+    )
+
+    ai_style = ParagraphStyle(
+        'AIInsights',
+        parent=styles['Normal'],
+        fontName='Helvetica-Oblique',
+        fontSize=9.5,
+        leading=14,
+        textColor=colors.HexColor('#1e293b'),
+        spaceAfter=6
+    )
+
+    meta_style = ParagraphStyle(
+        'NoteMeta',
+        parent=styles['Normal'],
+        fontName='Helvetica-Oblique',
+        fontSize=8.5,
+        leading=12,
+        textColor=colors.HexColor('#64748b')
+    )
+
+    story = []
+
+    # Title & Metadata
+    title_text = note.get('title') or "Untitled Note"
+    story.append(Paragraph(title_text, title_style))
+
+    tags = note.get('tags', [])
+    tags_str = ", ".join([f"#{t}" for t in tags]) if tags else "None"
+    created = note.get('created_at', datetime.now().strftime('%b %d, %Y'))
+    sub_text = f"Tags: {tags_str}  |  Date: {created}  |  Digitized with NoteExtract AI"
+    story.append(Paragraph(sub_text, subtitle_style))
+    story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#6366f1'), spaceAfter=16))
+
+    # AI Insights (if available)
+    if note.get('ai_insights'):
+        insights_data = [[
+            Paragraph(f"<b>AI Summary & Key Takeaways:</b><br/>{note['ai_insights']}", ai_style)
+        ]]
+        insights_table = Table(insights_data, colWidths=[520])
+        insights_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f1f5f9')),
+            ('PADDING', (0, 0), (-1, -1), 8),
+            ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#cbd5e1')),
+            ('LINELEFT', (0, 0), (0, -1), 3, colors.HexColor('#6366f1')),
+        ]))
+        story.append(insights_table)
+        story.append(Spacer(1, 14))
+
+    # Note Content
+    content_text = note.get('content') or note.get('extracted_text') or "No content."
+    for line in content_text.split('\n'):
+        line_clean = line.strip()
+        if not line_clean:
+            story.append(Spacer(1, 4))
+            continue
+
+        formatted_line = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', line_clean)
+        formatted_line = re.sub(r'\*(.*?)\*', r'<i>\1</i>', formatted_line)
+
+        if line_clean.startswith('#'):
+            header_text = line_clean.lstrip('#').strip()
+            story.append(Paragraph(f"<b>{header_text}</b>", ParagraphStyle(
+                'SubHead',
+                parent=body_style,
+                fontName='Helvetica-Bold',
+                fontSize=12,
+                leading=16,
+                spaceBefore=8,
+                spaceAfter=4,
+                textColor=colors.HexColor('#0f172a')
+            )))
+        elif line_clean.startswith('-') or line_clean.startswith('*') or line_clean.startswith('•'):
+            bullet_text = line_clean.lstrip('-*• ').strip()
+            story.append(Paragraph(f"&bull; {bullet_text}", ParagraphStyle('Bullet', parent=body_style, leftIndent=12)))
+        else:
+            story.append(Paragraph(formatted_line, body_style))
+
+    story.append(Spacer(1, 20))
+    story.append(HRFlowable(width="100%", thickness=0.75, color=colors.HexColor('#e2e8f0'), spaceAfter=8))
+    story.append(Paragraph("NoteExtract AI &bull; Grounded Document Intelligence Platform", meta_style))
+
+    doc.build(story)
+
+
+def generate_single_note_markdown(note):
+    """
+    Generates a Markdown (.md) representation of a single note.
+    """
+    lines = []
+    lines.append(f"# {note.get('title', 'Untitled Note')}\n")
+    tags = note.get('tags', [])
+    if tags:
+        lines.append(f"**Tags:** {', '.join([f'#{t}' for t in tags])}  ")
+    lines.append(f"**Created:** {note.get('created_at', '')}  \n")
+
+    if note.get('ai_insights'):
+        lines.append(f"> **AI Insights:** {note['ai_insights']}\n")
+
+    lines.append("---\n")
+    lines.append(note.get('content') or note.get('extracted_text') or "")
+    lines.append("\n")
+    return "\n".join(lines)
+

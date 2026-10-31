@@ -1,4 +1,3 @@
-import React from 'react';
 import { 
   Star, 
   Trash2, 
@@ -6,8 +5,10 @@ import {
   Calendar, 
   FileText, 
   Sparkles, 
-  Image as ImageIcon
+  Image as ImageIcon,
+  Download
 } from 'lucide-react';
+import { api } from '../services/api';
 
 export default function NoteCard({ note, onClick, onSelect, onToggleFavorite, onDelete }) {
   const isFav = !!note.is_favorite;
@@ -141,17 +142,31 @@ export default function NoteCard({ note, onClick, onSelect, onToggleFavorite, on
             )}
           </div>
 
-          <button
-            className="btn btn-ghost btn-icon"
-            style={{ color: 'var(--text-dim)', padding: '4px' }}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (onDelete) onDelete(note.id);
-            }}
-            title="Delete Note"
-          >
-            <Trash2 size={15} />
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <button
+              className="btn btn-ghost btn-icon"
+              style={{ color: '#818cf8', padding: '4px' }}
+              onClick={(e) => {
+                e.stopPropagation();
+                window.open(api.getNoteExportPdfUrl(note.id), '_blank');
+              }}
+              title="Download Note PDF"
+            >
+              <Download size={14} />
+            </button>
+
+            <button
+              className="btn btn-ghost btn-icon"
+              style={{ color: 'var(--text-dim)', padding: '4px' }}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onDelete) onDelete(note.id);
+              }}
+              title="Delete Note"
+            >
+              <Trash2 size={15} />
+            </button>
+          </div>
         </div>
       </div>
     </div>

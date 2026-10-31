@@ -60,6 +60,7 @@ export default function App() {
   const [showUploader, setShowUploader] = useState(false);
   const [showManualModal, setShowManualModal] = useState(false);
   const [activeNote, setActiveNote] = useState(null);
+  const [noteFromCitation, setNoteFromCitation] = useState(false);
   const [showBatchUploader, setShowBatchUploader] = useState(false);
   const [activeNotebookId, setActiveNotebookId] = useState(null);
   const [activeNotebookInitialPage, setActiveNotebookInitialPage] = useState(0);
@@ -241,6 +242,7 @@ export default function App() {
       targetNote = notes.find(n => n.title.toLowerCase().trim() === noteTitle.toLowerCase().trim());
     }
     if (targetNote) {
+      setNoteFromCitation(true);
       setActiveNote(targetNote);
       setShowGlobalChat(false);
     } else {
@@ -664,7 +666,11 @@ export default function App() {
         <NoteModal
           note={activeNote}
           noteId={activeNote.id}
-          onClose={() => setActiveNote(null)}
+          fromCitation={noteFromCitation}
+          onClose={() => {
+            setActiveNote(null);
+            setNoteFromCitation(false);
+          }}
           onNoteUpdated={handleNoteUpdated}
           onDeleteNote={handleDeleteNote}
           onNoteDeleted={handleDeleteNote}

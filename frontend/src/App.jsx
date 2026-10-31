@@ -18,6 +18,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import Navbar from './components/Navbar';
+import Sidebar from './components/Sidebar';
 import StatsBar from './components/StatsBar';
 import ImageUploader from './components/ImageUploader';
 import NoteCard from './components/NoteCard';
@@ -70,6 +71,7 @@ export default function App() {
   const [showTelemetryModal, setShowTelemetryModal] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   // Toast notifications
   const [toasts, setToasts] = useState([]);
@@ -283,19 +285,25 @@ export default function App() {
   };
 
   return (
-    <div className="app-container">
+    <div className="app-layout">
       {/* Toast Alerts */}
       <Toast toasts={toasts} onDismiss={dismissToast} />
 
-      {/* Top Header Navbar */}
-      <Navbar
-        backendOnline={backendOnline}
+      {/* Mobile Drawer Backdrop */}
+      <div 
+        className={`sidebar-backdrop ${sidebarOpen ? 'open' : ''}`} 
+        onClick={() => setSidebarOpen(false)} 
+      />
+
+      {/* Left Workspace Navigation & Tools Sidebar (Option 1) */}
+      <Sidebar
+        isOpen={sidebarOpen}
+        onToggle={() => setSidebarOpen(prev => !prev)}
+        onCloseMobile={() => setSidebarOpen(false)}
         activeTab={activeTab}
         onChangeTab={(t) => setActiveTab(t)}
         onNewNote={() => setShowManualModal(true)}
-        onOpenManualNote={() => setShowManualModal(true)}
         onNewUpload={() => setShowUploader(prev => !prev)}
-        onOpenUpload={() => setShowUploader(prev => !prev)}
         onOpenBatchNotebook={() => setShowBatchUploader(true)}
         onOpenGlobalChat={() => setShowGlobalChat(true)}
         onOpenTelemetry={() => setShowTelemetryModal(true)}
@@ -305,10 +313,29 @@ export default function App() {
         onOpenAuth={() => setShowAuthModal(true)}
         onSignOut={handleSignOut}
         stats={stats}
-        onRefresh={() => loadData(true)}
-        refreshing={refreshing}
+        backendOnline={backendOnline}
         showToast={addToast}
       />
+
+      {/* Main Workspace Canvas */}
+      <div className="app-main">
+        {/* Streamlined Top Header */}
+        <Navbar
+          onToggleSidebar={() => setSidebarOpen(prev => !prev)}
+          activeTab={activeTab}
+          onChangeTab={(t) => setActiveTab(t)}
+          onNewNote={() => setShowManualModal(true)}
+          onNewUpload={() => setShowUploader(prev => !prev)}
+          onOpenBatchNotebook={() => setShowBatchUploader(true)}
+          onOpenGlobalChat={() => setShowGlobalChat(true)}
+          stats={stats}
+          backendOnline={backendOnline}
+          onRefresh={() => loadData(true)}
+          refreshing={refreshing}
+        />
+
+        {/* Content Container */}
+        <div className="app-content">
 
       {/* Render Free Cloud Cold-Start Awakening Indicator */}
       {!backendOnline && !loading && !dismissColdStartBanner && (
@@ -695,6 +722,8 @@ export default function App() {
           </div>
         )
       )}
+        </div> {/* /.app-content */}
+      </div> {/* /.app-main */}
 
       {/* Note Detail Modal */}
       {activeNote && (

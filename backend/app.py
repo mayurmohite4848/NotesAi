@@ -31,6 +31,7 @@ from backend.db import init_db
 from backend.routes.notes import notes_bp
 from backend.routes.notebooks import notebooks_bp
 from backend.routes.telemetry import telemetry_bp
+from backend.routes.demo import demo_bp
 
 def create_app(test_config=None):
     """Application factory for the Flask backend."""
@@ -61,6 +62,7 @@ def create_app(test_config=None):
     app.register_blueprint(notes_bp)
     app.register_blueprint(notebooks_bp)
     app.register_blueprint(telemetry_bp)
+    app.register_blueprint(demo_bp)
 
     # Serve uploaded images
     @app.route("/api/uploads/<path:filename>", methods=["GET"])

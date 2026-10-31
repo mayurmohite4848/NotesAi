@@ -332,6 +332,22 @@ export const api = {
     return request('/api/telemetry/logs', {
       method: 'DELETE'
     });
+  },
+
+  // ==========================================
+  // DEMO SAMPLES & TEST DATA API
+  // ==========================================
+
+  async seedDemoSamples() {
+    return request('/api/demo/seed', {
+      method: 'POST'
+    });
+  },
+
+  async clearDemoSamples() {
+    return request('/api/demo/clear', {
+      method: 'DELETE'
+    });
   }
 };
 

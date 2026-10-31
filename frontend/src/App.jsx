@@ -11,7 +11,11 @@ import {
   X,
   Plus,
   BookOpen,
-  Layers
+  Layers,
+  Zap,
+  Clock,
+  Loader2,
+  RefreshCw
 } from 'lucide-react';
 import Navbar from './components/Navbar';
 import StatsBar from './components/StatsBar';
@@ -36,6 +40,8 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [backendOnline, setBackendOnline] = useState(false);
+  const [seedingDemo, setSeedingDemo] = useState(false);
+  const [dismissColdStartBanner, setDismissColdStartBanner] = useState(false);
 
   // Notebooks State
   const [notebooks, setNotebooks] = useState([]);
@@ -178,6 +184,21 @@ export default function App() {
     }
   };
 
+  // Handle 1-Click Demo Samples Seeding
+  const handleSeedDemoSamples = async () => {
+    setSeedingDemo(true);
+    try {
+      const res = await api.seedDemoSamples();
+      addToast(res.message || 'Demo notes and notebook loaded! Explore math, diagrams, and AI RAG.', 'success');
+      await loadData(true);
+    } catch (err) {
+      console.error('Failed to seed demo samples:', err);
+      addToast(err.message || 'Could not load demo samples. Backend may be waking up, please retry.', 'error');
+    } finally {
+      setSeedingDemo(false);
+    }
+  };
+
   const handleNoteCreated = (newNote) => {
     setNotes((prev) => [newNote, ...prev]);
     loadData();
@@ -244,11 +265,65 @@ export default function App() {
         onOpenBatchNotebook={() => setShowBatchUploader(true)}
         onOpenGlobalChat={() => setShowGlobalChat(true)}
         onOpenTelemetry={() => setShowTelemetryModal(true)}
+        onSeedDemo={handleSeedDemoSamples}
+        seedingDemo={seedingDemo}
         stats={stats}
         onRefresh={() => loadData(true)}
         refreshing={refreshing}
         showToast={addToast}
       />
+
+      {/* Render Free Cloud Cold-Start Awakening Indicator */}
+      {!backendOnline && !loading && !dismissColdStartBanner && (
+        <div style={{
+          background: 'linear-gradient(90deg, rgba(245, 158, 11, 0.12) 0%, rgba(99, 102, 241, 0.12) 100%)',
+          border: '1px solid rgba(245, 158, 11, 0.35)',
+          borderRadius: 'var(--radius-md)',
+          padding: '12px 18px',
+          marginBottom: '20px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '12px',
+          flexWrap: 'wrap'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Clock size={18} color="#fbbf24" style={{ flexShrink: 0 }} />
+            <div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#fef3c7' }}>
+                Cloud Backend Waking Up (~30–45s)
+              </div>
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                Render's free cloud instance enters sleep mode when idle to remain free. Once warmed up, all OCR and RAG responses are instant.
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={() => loadData(true)}
+              disabled={refreshing}
+              style={{ fontSize: '0.75rem', padding: '4px 10px' }}
+            >
+              <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} />
+              <span>{refreshing ? 'Connecting...' : 'Check Status'}</span>
+            </button>
+            <button
+              onClick={() => setDismissColdStartBanner(true)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'var(--text-dim)',
+                cursor: 'pointer',
+                padding: '4px'
+              }}
+              title="Dismiss notice"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Statistics & Filter Bar */}
       <StatsBar
@@ -434,40 +509,63 @@ export default function App() {
           /* Empty State for Notebooks */
           <div className="glass-panel" style={{
             textAlign: 'center',
-            padding: '60px 20px',
+            padding: '50px 24px',
             margin: '20px 0',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            gap: '16px'
+            gap: '18px'
           }}>
             <div style={{
               width: '64px',
               height: '64px',
               borderRadius: '20px',
-              background: 'rgba(99, 102, 241, 0.12)',
+              background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.2) 0%, rgba(6, 182, 212, 0.2) 100%)',
+              border: '1px solid rgba(99, 102, 241, 0.35)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#818cf8'
+              color: '#818cf8',
+              boxShadow: '0 0 20px rgba(99, 102, 241, 0.2)'
             }}>
               <BookOpen size={32} />
             </div>
             <div>
-              <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-main)' }}>
-                No Multi-Page Notebooks Created Yet
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                {searchQuery || selectedSubject ? 'No Matching Notebooks Found' : 'No Notebooks in Workspace Yet'}
               </h3>
-              <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', marginTop: '4px', maxWidth: '460px' }}>
-                Upload multiple handwritten pages at once or a scanned PDF to build a structured multi-page notebook with PDF export.
+              <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', marginTop: '6px', maxWidth: '480px' }}>
+                {searchQuery || selectedSubject 
+                  ? 'Try clearing your search query or subject filter to view all notebooks.'
+                  : 'Load our pre-built Deep Learning research notebook with KaTeX math and Mermaid architecture graphs, or scan your own handwritten notes.'}
               </p>
             </div>
-            <button
-              className="btn btn-primary"
-              onClick={() => setShowBatchUploader(true)}
-            >
-              <Sparkles size={16} />
-              <span>Create First Multi-Page Notebook</span>
-            </button>
+
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
+              <button
+                className="btn btn-primary"
+                onClick={handleSeedDemoSamples}
+                disabled={seedingDemo}
+                style={{
+                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                  border: 'none',
+                  color: '#ffffff',
+                  fontWeight: 700,
+                  boxShadow: '0 0 16px rgba(245, 158, 11, 0.35)'
+                }}
+              >
+                {seedingDemo ? <Loader2 size={16} className="animate-spin" /> : <Zap size={16} />}
+                <span>{seedingDemo ? 'Loading Samples...' : '⚡ Load Demo Notebook (1-Click)'}</span>
+              </button>
+
+              <button
+                className="btn btn-secondary"
+                onClick={() => setShowBatchUploader(true)}
+              >
+                <Plus size={16} />
+                <span>Upload Custom Notebook / PDF</span>
+              </button>
+            </div>
           </div>
         )
       ) : (
@@ -490,49 +588,71 @@ export default function App() {
           /* Empty State for Notes */
           <div className="glass-panel" style={{
             textAlign: 'center',
-            padding: '60px 20px',
+            padding: '50px 24px',
             margin: '20px 0',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            gap: '16px'
+            gap: '18px'
           }}>
             <div style={{
               width: '64px',
               height: '64px',
               borderRadius: '20px',
-              background: 'rgba(99, 102, 241, 0.12)',
+              background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.2) 0%, rgba(6, 182, 212, 0.2) 100%)',
+              border: '1px solid rgba(99, 102, 241, 0.35)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#818cf8'
+              color: '#818cf8',
+              boxShadow: '0 0 20px rgba(99, 102, 241, 0.2)'
             }}>
               <FileText size={32} />
             </div>
             <div>
-              <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-main)' }}>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)' }}>
                 {searchQuery || selectedTag || showFavoritesOnly
                   ? 'No matching notes found'
-                  : 'No notes stored in SQLite yet'}
+                  : 'Instant Portfolio Showcase'}
               </h3>
-              <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', marginTop: '4px', maxWidth: '420px' }}>
-                Upload a handwritten photo or create a plain text note to get started.
+              <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', marginTop: '6px', maxWidth: '480px' }}>
+                {searchQuery || selectedTag || showFavoritesOnly
+                  ? 'Try clearing your search query or tag filters to see all notes.'
+                  : 'Load curated LaTeX math and Mermaid diagram demo notes to test grounded AI RAG, formula rendering, and export features without uploading files.'}
               </p>
             </div>
-            <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
+            
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
               <button
                 className="btn btn-primary"
+                onClick={handleSeedDemoSamples}
+                disabled={seedingDemo}
+                style={{
+                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                  border: 'none',
+                  color: '#ffffff',
+                  fontWeight: 700,
+                  boxShadow: '0 0 16px rgba(245, 158, 11, 0.35)'
+                }}
+              >
+                {seedingDemo ? <Loader2 size={16} className="animate-spin" /> : <Zap size={16} />}
+                <span>{seedingDemo ? 'Loading Samples...' : '⚡ Try Demo Notes & Diagrams (1-Click)'}</span>
+              </button>
+
+              <button
+                className="btn btn-secondary"
                 onClick={() => setShowUploader(true)}
               >
                 <UploadCloud size={16} />
-                <span>Transcribe Single Photo</span>
+                <span>Upload Handwritten Photo</span>
               </button>
+
               <button
                 className="btn btn-secondary"
-                onClick={() => setShowBatchUploader(true)}
+                onClick={() => setShowManualModal(true)}
               >
-                <BookOpen size={16} />
-                <span>Create Notebook</span>
+                <Plus size={16} />
+                <span>Write New Note</span>
               </button>
             </div>
           </div>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Sparkles, Key, FileText, Check, X, RefreshCw, AlertCircle, Loader2, BookOpen, Layers, Globe, Activity } from 'lucide-react';
+import { Sparkles, Key, FileText, Check, X, RefreshCw, AlertCircle, Loader2, BookOpen, Layers, Globe, Activity, Zap } from 'lucide-react';
 import { api } from '../services/api';
 
 export default function Navbar({ 
@@ -10,6 +10,8 @@ export default function Navbar({
   onOpenBatchNotebook,
   onOpenGlobalChat,
   onOpenTelemetry,
+  onSeedDemo,
+  seedingDemo = false,
   activeTab = 'notes', // 'notes' | 'notebooks'
   onChangeTab,
   stats, 
@@ -102,9 +104,36 @@ export default function Navbar({
               <BookOpen size={18} color="#ffffff" />
             </div>
             <div>
-              <span style={{ fontSize: '1.15rem', fontWeight: 800, letterSpacing: '-0.02em', color: '#ffffff', whiteSpace: 'nowrap' }}>
-                NoteExtract <span style={{ color: 'var(--accent-secondary)' }}>AI</span>
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontSize: '1.15rem', fontWeight: 800, letterSpacing: '-0.02em', color: '#ffffff', whiteSpace: 'nowrap' }}>
+                  NoteExtract <span style={{ color: 'var(--accent-secondary)' }}>AI</span>
+                </span>
+                <span 
+                  title={backendOnline ? "AI Cloud Engine is live and connected" : "Connecting to cloud backend on Render"}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '1px 6px',
+                    borderRadius: '999px',
+                    fontSize: '0.62rem',
+                    fontWeight: 700,
+                    background: backendOnline ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                    border: backendOnline ? '1px solid rgba(16, 185, 129, 0.35)' : '1px solid rgba(245, 158, 11, 0.35)',
+                    color: backendOnline ? '#34d399' : '#fbbf24',
+                    cursor: 'default'
+                  }}
+                >
+                  <span style={{
+                    width: '6px',
+                    height: '6px',
+                    borderRadius: '50%',
+                    background: backendOnline ? '#10b981' : '#f59e0b',
+                    boxShadow: backendOnline ? '0 0 6px #10b981' : '0 0 6px #f59e0b'
+                  }} />
+                  <span>{backendOnline ? 'Live' : 'Connecting'}</span>
+                </span>
+              </div>
               <span style={{
                 display: 'block',
                 fontSize: '0.68rem',
@@ -229,6 +258,29 @@ export default function Navbar({
             >
               <Activity size={13} color="#34d399" />
               <span>Telemetry</span>
+            </button>
+          )}
+
+          {onSeedDemo && (
+            <button
+              id="btn-seed-demo-samples"
+              className="btn btn-secondary btn-sm"
+              onClick={onSeedDemo}
+              disabled={seedingDemo}
+              title="Load rich LaTeX math and Mermaid diagram demo samples"
+              style={{
+                background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.16) 0%, rgba(99, 102, 241, 0.16) 100%)',
+                border: '1px solid rgba(245, 158, 11, 0.45)',
+                color: '#fef3c7',
+                padding: '6px 11px',
+                whiteSpace: 'nowrap',
+                fontSize: '0.8rem',
+                gap: '5px',
+                fontWeight: 700
+              }}
+            >
+              {seedingDemo ? <Loader2 size={13} className="animate-spin" color="#fbbf24" /> : <Zap size={13} color="#fbbf24" />}
+              <span>{seedingDemo ? 'Loading...' : '⚡ Try Samples'}</span>
             </button>
           )}
 

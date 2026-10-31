@@ -258,35 +258,54 @@ export const api = {
   },
 
   /**
-   * Universal Blob File Downloader
-   * Bypasses browser popup blockers by streaming via fetch and triggering direct anchor download.
+   * Universal File Downloader
+   * First attempts in-memory Blob stream with Content-Disposition parsing.
+   * If any network/CORS restriction interrupts blob reading, falls back to direct anchor download.
    */
   async downloadBlob(url, defaultFilename = 'document') {
     const fullUrl = `${API_BASE}${url.startsWith('/') ? url : `/${url}`}`;
-    const response = await fetch(fullUrl);
-    if (!response.ok) {
-      throw new Error(`Download failed: HTTP ${response.status}`);
-    }
-
-    let filename = defaultFilename;
-    const disposition = response.headers.get('Content-Disposition') || response.headers.get('content-disposition');
-    if (disposition && disposition.includes('filename=')) {
-      const match = disposition.match(/filename=["']?([^"';]+)["']?/i);
-      if (match && match[1]) {
-        filename = match[1].trim();
+    try {
+      const response = await fetch(fullUrl);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
       }
-    }
 
-    const blob = await response.blob();
-    const blobUrl = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = blobUrl;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000);
-    return filename;
+      let filename = defaultFilename;
+      try {
+        const disposition = response.headers.get('Content-Disposition') || response.headers.get('content-disposition');
+        if (disposition && disposition.includes('filename=')) {
+          const match = disposition.match(/filename=["']?([^"';]+)["']?/i);
+          if (match && match[1]) {
+            filename = match[1].trim();
+          }
+        }
+      } catch (e) {
+        // use defaultFilename
+      }
+
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => window.URL.revokeObjectURL(blobUrl), 3000);
+      return filename;
+    } catch (err) {
+      console.warn('Blob streaming failed, using direct anchor fallback:', err);
+      const fallbackLink = document.createElement('a');
+      fallbackLink.href = fullUrl;
+      fallbackLink.download = defaultFilename;
+      fallbackLink.target = '_blank';
+      fallbackLink.rel = 'noopener noreferrer';
+      document.body.appendChild(fallbackLink);
+      fallbackLink.click();
+      document.body.removeChild(fallbackLink);
+      return defaultFilename;
+    }
   },
 
   async downloadNotePdf(noteId, title = 'note') {

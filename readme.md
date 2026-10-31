@@ -1,6 +1,6 @@
 # NoteExtract AI — Multi-Modal Document Intelligence & Grounded RAG Platform
 
-[![Live Frontend on Vercel](https://img.shields.io/badge/Vercel-Live%20Demo-black?style=for-the-badge&logo=vercel)](https://notes-ai-snowy-kappa.vercel.app/)
+[![Live Frontend on Vercel](https://img.shields.io/badge/Vercel-Live%20Demo-black?style=for-the-badge&logo=vercel)](https://notesextract-ai.vercel.app/)
 [![Backend API on Render](https://img.shields.io/badge/Render-Cloud%20API-46E3B7?style=for-the-badge&logo=render)](https://notesai-backend-i1u8.onrender.com/api/health)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![React 19](https://img.shields.io/badge/React-19.0-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
@@ -16,7 +16,7 @@
 
 | Component | Platform | URL | Status |
 | :--- | :--- | :--- | :--- |
-| **Web Frontend (SPA)** | **Vercel** | [https://notes-ai-snowy-kappa.vercel.app/](https://notes-ai-snowy-kappa.vercel.app/) | ![Vercel Deployment](https://img.shields.io/badge/Status-Online-34d399) |
+| **Web Frontend (SPA)** | **Vercel** | [https://notesextract-ai.vercel.app/](https://notesextract-ai.vercel.app/) | ![Vercel Deployment](https://img.shields.io/badge/Status-Online-34d399) |
 | **Backend REST API** | **Render** | [https://notesai-backend-i1u8.onrender.com/](https://notesai-backend-i1u8.onrender.com/api/health) | ![Render Cloud](https://img.shields.io/badge/Status-Healthy%20(v2.0)-34d399) |
 
 *Note: The free Render backend enters sleep mode when idle. A built-in client-side awakening indicator gracefully notifies visitors while the instance warms up (~30–45s).*

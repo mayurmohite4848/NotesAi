@@ -56,7 +56,7 @@ def create_app(test_config=None):
     init_db(app.config["DATABASE_PATH"])
 
     # Enable CORS for all routes (allows React frontend on any local port)
-    CORS(app, resources={r"/api/*": {"origins": "*"}})
+    CORS(app, resources={r"/api/*": {"origins": "*"}}, expose_headers=["Content-Disposition"])
 
     # Register Blueprints
     app.register_blueprint(notes_bp)

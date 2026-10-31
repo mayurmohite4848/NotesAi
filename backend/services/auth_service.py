@@ -3,7 +3,8 @@ import jwt
 from functools import wraps
 from flask import request, jsonify
 
-SUPABASE_JWT_SECRET = os.environ.get("SUPABASE_JWT_SECRET", "")
+def get_jwt_secret():
+    return os.environ.get("SUPABASE_JWT_SECRET", "").strip()
 
 def get_current_user_id():
     """
@@ -18,11 +19,13 @@ def get_current_user_id():
     if not token:
         return None
 
+    secret = get_jwt_secret()
+
     try:
-        if SUPABASE_JWT_SECRET:
+        if secret:
             payload = jwt.decode(
                 token,
-                SUPABASE_JWT_SECRET,
+                secret,
                 algorithms=["HS256"],
                 audience="authenticated"
             )

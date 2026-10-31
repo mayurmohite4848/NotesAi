@@ -84,10 +84,39 @@ def create_app(test_config=None):
     # Health check endpoint
     @app.route("/api/health", methods=["GET"])
     def health_check():
+        jwt_secret = os.environ.get("SUPABASE_JWT_SECRET", "").strip()
         return jsonify({
             "status": "healthy",
             "service": "Flask Notes & Image Extraction API",
-            "version": "2.0.0"
+            "version": "2.1.0",
+            "supabase_auth_ready": bool(jwt_secret)
+        }), 200
+
+    # Supabase Auth Verification & Diagnostics endpoint
+    @app.route("/api/auth/status", methods=["GET"])
+    def auth_status():
+        jwt_secret = os.environ.get("SUPABASE_JWT_SECRET", "").strip()
+        auth_header = request.headers.get("Authorization", "")
+        token_info = None
+
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.split(" ", 1)[1].strip()
+            try:
+                import jwt as pyjwt
+                if jwt_secret:
+                    payload = pyjwt.decode(token, jwt_secret, algorithms=["HS256"], audience="authenticated")
+                    token_info = {"valid": True, "user_id": payload.get("sub"), "email": payload.get("email")}
+                else:
+                    payload = pyjwt.decode(token, options={"verify_signature": False})
+                    token_info = {"valid": "unverified (no secret set)", "user_id": payload.get("sub"), "email": payload.get("email")}
+            except Exception as e:
+                token_info = {"valid": False, "error": str(e)}
+
+        return jsonify({
+            "supabase_jwt_configured": bool(jwt_secret),
+            "jwt_secret_length": len(jwt_secret) if jwt_secret else 0,
+            "auth_mode": "supabase_multi_tenant" if jwt_secret else "guest_fallback",
+            "token_verification": token_info
         }), 200
 
     # Error handlers

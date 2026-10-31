@@ -259,17 +259,39 @@ export const api = {
 
   /**
    * Universal File Downloader
-   * First attempts in-memory Blob stream with Content-Disposition parsing.
-   * If any network/CORS restriction interrupts blob reading, falls back to direct anchor download.
+   * Robust multi-tier download strategy:
+   * Tier 1: In-memory fetch -> Blob -> createObjectURL -> anchor click.
+   * Tier 2: Direct invisible anchor download fallback.
+   * Surfaces genuine server errors instead of silently masking them.
    */
   async downloadBlob(url, defaultFilename = 'document') {
-    const fullUrl = `${API_BASE}${url.startsWith('/') ? url : `/${url}`}`;
+    const isVercel = typeof window !== 'undefined' && window.location.hostname.includes('vercel.app');
+    const targetUrl = isVercel 
+      ? (url.startsWith('/') ? url : `/${url}`)
+      : `${API_BASE}${url.startsWith('/') ? url : `/${url}`}`;
+
     try {
-      const response = await fetch(fullUrl);
+      const response = await fetch(targetUrl, {
+        headers: {
+          'Accept': '*/*'
+        }
+      });
+
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+        let errMsg = `Server returned HTTP ${response.status}`;
+        try {
+          const errData = await response.json();
+          if (errData && errData.error) errMsg = errData.error;
+        } catch (_) {
+          try {
+            const errText = await response.text();
+            if (errText && errText.length < 200) errMsg = errText;
+          } catch (_) {}
+        }
+        throw new Error(errMsg);
       }
 
+      // Extract filename from Content-Disposition header if available
       let filename = defaultFilename;
       try {
         const disposition = response.headers.get('Content-Disposition') || response.headers.get('content-disposition');
@@ -284,27 +306,55 @@ export const api = {
       }
 
       const blob = await response.blob();
-      const blobUrl = window.URL.createObjectURL(blob);
+      const contentType = response.headers.get('content-type') || (filename.endsWith('.pdf') ? 'application/pdf' : 'text/plain');
+      const typedBlob = new Blob([blob], { type: contentType });
+      const blobUrl = window.URL.createObjectURL(typedBlob);
+
       const link = document.createElement('a');
+      link.style.display = 'none';
       link.href = blobUrl;
       link.download = filename;
       link.setAttribute('download', filename);
       document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      setTimeout(() => window.URL.revokeObjectURL(blobUrl), 3000);
+      
+      try {
+        link.click();
+      } catch (_) {
+        const evt = new MouseEvent('click', { bubbles: true, cancelable: true, view: window });
+        link.dispatchEvent(evt);
+      }
+
+      setTimeout(() => {
+        try {
+          document.body.removeChild(link);
+          window.URL.revokeObjectURL(blobUrl);
+        } catch (_) {}
+      }, 15000);
+
       return filename;
     } catch (err) {
-      console.warn('Blob streaming failed, using direct anchor fallback:', err);
-      const fallbackLink = document.createElement('a');
-      fallbackLink.href = fullUrl;
-      fallbackLink.download = defaultFilename;
-      fallbackLink.target = '_blank';
-      fallbackLink.rel = 'noopener noreferrer';
-      document.body.appendChild(fallbackLink);
-      fallbackLink.click();
-      document.body.removeChild(fallbackLink);
-      return defaultFilename;
+      console.warn('Blob fetch failed, checking fallback:', err);
+      // If error came from backend with 404/400/500, rethrow so UI displays accurate message
+      if (err.message && (err.message.includes('not found') || err.message.includes('HTTP 4') || err.message.includes('HTTP 5'))) {
+        throw err;
+      }
+
+      // Tier 2 Fallback: Direct invisible anchor download for browsers with strict blob policies
+      try {
+        const link = document.createElement('a');
+        link.style.display = 'none';
+        link.href = targetUrl;
+        link.download = defaultFilename;
+        link.setAttribute('download', defaultFilename);
+        document.body.appendChild(link);
+        link.click();
+        setTimeout(() => {
+          try { document.body.removeChild(link); } catch (_) {}
+        }, 10000);
+        return defaultFilename;
+      } catch (fallbackErr) {
+        throw err;
+      }
     }
   },
 

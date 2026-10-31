@@ -190,6 +190,75 @@ Where $\\text{head}_i = Attention(Q W_i^Q, K W_i^K, V W_i^V)$.
     ]
 }
 
+def seed_demo_data_internal(db_path=None):
+    """
+    Core internal helper to populate demo notes and multi-page notebooks.
+    Can be invoked by HTTP endpoint or on startup if database is empty.
+    """
+    if not db_path:
+        db_path = current_app.config.get("DATABASE_PATH")
+
+    # 1. Clear any existing demo-tagged notes & notebooks to allow idempotent re-seeding
+    existing_notes = get_all_notes(tag="demo", db_path=db_path)
+    for n in existing_notes:
+        delete_note(n["id"], db_path=db_path)
+
+    existing_notebooks = get_all_notebooks(search="Deep Learning & Neural Network Foundations", db_path=db_path)
+    for nb in existing_notebooks:
+        delete_notebook(nb["id"], db_path=db_path)
+
+    # 2. Create Sample Note 1 (Math & LaTeX)
+    note_1 = create_note(
+        title=SAMPLE_NOTE_1["title"],
+        content=SAMPLE_NOTE_1["content"],
+        extracted_text=SAMPLE_NOTE_1["content"],
+        tags=SAMPLE_NOTE_1["tags"],
+        ai_insights=SAMPLE_NOTE_1["ai_insights"],
+        is_favorite=SAMPLE_NOTE_1["is_favorite"],
+        db_path=db_path
+    )
+
+    # 3. Create Sample Note 2 (System Architecture & Mermaid)
+    note_2 = create_note(
+        title=SAMPLE_NOTE_2["title"],
+        content=SAMPLE_NOTE_2["content"],
+        extracted_text=SAMPLE_NOTE_2["content"],
+        tags=SAMPLE_NOTE_2["tags"],
+        ai_insights=SAMPLE_NOTE_2["ai_insights"],
+        is_favorite=SAMPLE_NOTE_2["is_favorite"],
+        db_path=db_path
+    )
+
+    # 4. Create Multi-Page Notebook (3 Pages with Math, Mermaid & Grounded RAG content)
+    notebook = create_notebook(
+        title=SAMPLE_NOTEBOOK["title"],
+        description=SAMPLE_NOTEBOOK["description"],
+        subject_tag=SAMPLE_NOTEBOOK["subject_tag"],
+        cover_color=SAMPLE_NOTEBOOK["cover_color"],
+        is_favorite=SAMPLE_NOTEBOOK["is_favorite"],
+        db_path=db_path
+    )
+
+    created_pages = []
+    for p in SAMPLE_NOTEBOOK["pages"]:
+        page = add_notebook_page(
+            notebook_id=notebook["id"],
+            title=p["title"],
+            content=p["content"],
+            page_number=p["page_number"],
+            db_path=db_path
+        )
+        created_pages.append(page)
+
+    return {
+        "notes": [note_1, note_2],
+        "notebook": {
+            **notebook,
+            "pages": created_pages,
+            "page_count": len(created_pages)
+        }
+    }
+
 @demo_bp.route("/api/demo/seed", methods=["POST"])
 def seed_demo_samples():
     """
@@ -198,68 +267,13 @@ def seed_demo_samples():
     """
     try:
         db_path = current_app.config.get("DATABASE_PATH")
-        
-        # 1. Clear any existing demo-tagged notes & notebooks to allow idempotent re-seeding
-        existing_notes = get_all_notes(tag="demo", db_path=db_path)
-        for n in existing_notes:
-            delete_note(n["id"], db_path=db_path)
-
-        existing_notebooks = get_all_notebooks(search="Deep Learning & Neural Network Foundations", db_path=db_path)
-        for nb in existing_notebooks:
-            delete_notebook(nb["id"], db_path=db_path)
-
-        # 2. Create Sample Note 1 (Math & LaTeX)
-        note_1 = create_note(
-            title=SAMPLE_NOTE_1["title"],
-            content=SAMPLE_NOTE_1["content"],
-            extracted_text=SAMPLE_NOTE_1["content"],
-            tags=SAMPLE_NOTE_1["tags"],
-            ai_insights=SAMPLE_NOTE_1["ai_insights"],
-            is_favorite=SAMPLE_NOTE_1["is_favorite"],
-            db_path=db_path
-        )
-
-        # 3. Create Sample Note 2 (System Architecture & Mermaid)
-        note_2 = create_note(
-            title=SAMPLE_NOTE_2["title"],
-            content=SAMPLE_NOTE_2["content"],
-            extracted_text=SAMPLE_NOTE_2["content"],
-            tags=SAMPLE_NOTE_2["tags"],
-            ai_insights=SAMPLE_NOTE_2["ai_insights"],
-            is_favorite=SAMPLE_NOTE_2["is_favorite"],
-            db_path=db_path
-        )
-
-        # 4. Create Multi-Page Notebook (3 Pages with Math, Mermaid & Grounded RAG content)
-        notebook = create_notebook(
-            title=SAMPLE_NOTEBOOK["title"],
-            description=SAMPLE_NOTEBOOK["description"],
-            subject_tag=SAMPLE_NOTEBOOK["subject_tag"],
-            cover_color=SAMPLE_NOTEBOOK["cover_color"],
-            is_favorite=SAMPLE_NOTEBOOK["is_favorite"],
-            db_path=db_path
-        )
-
-        created_pages = []
-        for p in SAMPLE_NOTEBOOK["pages"]:
-            page = add_notebook_page(
-                notebook_id=notebook["id"],
-                title=p["title"],
-                content=p["content"],
-                page_number=p["page_number"],
-                db_path=db_path
-            )
-            created_pages.append(page)
+        result = seed_demo_data_internal(db_path=db_path)
 
         return jsonify({
             "success": True,
             "message": "Demo sample notes and 3-page research notebook successfully loaded!",
-            "notes": [note_1, note_2],
-            "notebook": {
-                **notebook,
-                "pages": created_pages,
-                "page_count": len(created_pages)
-            }
+            "notes": result["notes"],
+            "notebook": result["notebook"]
         }), 201
 
     except Exception as e:

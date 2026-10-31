@@ -71,8 +71,29 @@ export default function NoteModal({
       const filename = await api.downloadNoteMd(targetNoteId, title);
       if (showToast) showToast(`Downloaded ${filename}!`, 'success');
     } catch (err) {
-      console.error('Download MD error:', err);
-      if (showToast) showToast(err.message || 'Failed to download Markdown.', 'error');
+      console.warn('Backend MD export failed, generating markdown locally:', err);
+      try {
+        const clientMd = `# ${title || 'Untitled Note'}\n\n${content || ''}`;
+        const blob = new Blob([clientMd], { type: 'text/markdown;charset=utf-8' });
+        const cleanTitle = (title || 'note').toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+        const filename = `${cleanTitle}.md`;
+        const blobUrl = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.style.display = 'none';
+        link.href = blobUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        setTimeout(() => {
+          try {
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(blobUrl);
+          } catch (_) {}
+        }, 10000);
+        if (showToast) showToast(`Downloaded ${filename}!`, 'success');
+      } catch (localErr) {
+        if (showToast) showToast(err.message || 'Failed to download Markdown.', 'error');
+      }
     } finally {
       setDownloadingMd(false);
     }

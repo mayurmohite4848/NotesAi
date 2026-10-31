@@ -237,8 +237,35 @@ export default function NotebookReaderModal({
       const filename = await api.downloadNotebookMd(notebook.id, notebook.title);
       if (showToast) showToast(`Downloaded ${filename}!`, 'success');
     } catch (err) {
-      console.error('Download notebook MD error:', err);
-      if (showToast) showToast(err.message || 'Failed to download Markdown.', 'error');
+      console.warn('Backend notebook MD export failed, falling back to local compilation:', err);
+      try {
+        let fullMd = `# ${notebook.title || 'Untitled Notebook'}\n\n`;
+        if (notebook.description) fullMd += `> ${notebook.description}\n\n---\n\n`;
+        if (notebook.pages && notebook.pages.length > 0) {
+          notebook.pages.forEach((p, idx) => {
+            fullMd += `## Page ${p.page_number || idx + 1}: ${p.title || 'Untitled Page'}\n\n${p.content || ''}\n\n---\n\n`;
+          });
+        }
+        const blob = new Blob([fullMd], { type: 'text/markdown;charset=utf-8' });
+        const cleanTitle = (notebook.title || 'notebook').toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+        const filename = `${cleanTitle}.md`;
+        const blobUrl = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.style.display = 'none';
+        link.href = blobUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        setTimeout(() => {
+          try {
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(blobUrl);
+          } catch (_) {}
+        }, 10000);
+        if (showToast) showToast(`Downloaded ${filename}!`, 'success');
+      } catch (localErr) {
+        if (showToast) showToast(err.message || 'Failed to download Markdown.', 'error');
+      }
     } finally {
       setDownloadingMd(false);
     }

@@ -55,6 +55,18 @@ def create_app(test_config=None):
     # Initialize Database
     init_db(app.config["DATABASE_PATH"])
 
+    # Auto-seed initial demo samples if database is brand new (e.g. Render container reboot)
+    if not app.config.get("TESTING"):
+        try:
+            from backend.db import get_all_notes
+            existing = get_all_notes(db_path=app.config["DATABASE_PATH"])
+            if len(existing) == 0:
+                from backend.routes.demo import seed_demo_data_internal
+                seed_demo_data_internal(db_path=app.config["DATABASE_PATH"])
+                print("[App] Empty database detected on startup - auto-seeded demo notes & notebooks.")
+        except Exception as e:
+            print(f"[App] Startup auto-seed warning: {e}")
+
     # Enable CORS for all routes (allows React frontend on any local port)
     CORS(app, resources={r"/api/*": {"origins": "*"}}, expose_headers=["Content-Disposition"])
 

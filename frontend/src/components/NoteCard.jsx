@@ -31,6 +31,7 @@ export default function NoteCard({ note, onClick, onSelect, onToggleFavorite, on
   };
 
   const [downloading, setDownloading] = useState(false);
+  const [downloadingMd, setDownloadingMd] = useState(false);
 
   const handleDownloadPdf = async (e) => {
     e.stopPropagation();
@@ -44,6 +45,41 @@ export default function NoteCard({ note, onClick, onSelect, onToggleFavorite, on
       if (showToast) showToast(err.message || 'Failed to download PDF.', 'error');
     } finally {
       setDownloading(false);
+    }
+  };
+
+  const handleDownloadMd = async (e) => {
+    e.stopPropagation();
+    setDownloadingMd(true);
+    try {
+      const filename = await api.downloadNoteMd(note.id, note.title);
+      if (showToast) showToast(`Downloaded ${filename}!`, 'success');
+    } catch (err) {
+      console.warn('Backend note MD export failed, generating locally:', err);
+      try {
+        const clientMd = `# ${note.title || 'Untitled Note'}\n\n${note.content || note.extracted_text || ''}`;
+        const blob = new Blob([clientMd], { type: 'text/markdown;charset=utf-8' });
+        const cleanTitle = (note.title || 'note').toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+        const filename = `${cleanTitle}.md`;
+        const blobUrl = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.style.display = 'none';
+        link.href = blobUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        setTimeout(() => {
+          try {
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(blobUrl);
+          } catch (_) {}
+        }, 10000);
+        if (showToast) showToast(`Downloaded ${filename}!`, 'success');
+      } catch (localErr) {
+        if (showToast) showToast(err.message || 'Failed to download Markdown.', 'error');
+      }
+    } finally {
+      setDownloadingMd(false);
     }
   };
 
@@ -170,6 +206,16 @@ export default function NoteCard({ note, onClick, onSelect, onToggleFavorite, on
               title="Download Note PDF"
             >
               {downloading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+            </button>
+
+            <button
+              className="btn btn-ghost btn-icon"
+              style={{ color: 'var(--text-muted)', padding: '4px' }}
+              onClick={handleDownloadMd}
+              disabled={downloadingMd}
+              title="Download Note Markdown (.md)"
+            >
+              {downloadingMd ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
             </button>
 
             <button

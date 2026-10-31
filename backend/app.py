@@ -25,7 +25,7 @@ def load_env_file():
 
 load_env_file()
 
-from flask import Flask, send_from_directory, jsonify
+from flask import Flask, send_from_directory, jsonify, request
 from flask_cors import CORS
 from backend.db import init_db
 from backend.routes.notes import notes_bp

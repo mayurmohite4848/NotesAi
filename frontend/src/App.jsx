@@ -43,6 +43,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [backendOnline, setBackendOnline] = useState(false);
+  const [backendStatus, setBackendStatus] = useState('connecting'); // 'connecting' | 'online' | 'cold_start' | 'offline'
   const [seedingDemo, setSeedingDemo] = useState(false);
   const [dismissColdStartBanner, setDismissColdStartBanner] = useState(false);
 
@@ -131,45 +132,81 @@ export default function App() {
   // Fetch stats and notes from Flask API
   const loadData = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
+    let healthOk = false;
     try {
-      await api.checkHealth();
+      setBackendStatus(prev => (prev === 'online' ? 'online' : 'connecting'));
+      await api.checkHealth({ timeout: 8000 });
+      healthOk = true;
       setBackendOnline(true);
-
-      const statsRes = await api.getStats();
-      setStats(statsRes.stats || {});
-
-      // Load single notes
-      const notesRes = await api.getNotes({
-        search: searchQuery,
-        tag: selectedTag,
-        favorite: showFavoritesOnly,
-        sortBy: sortBy,
-        order: sortOrder
-      });
-      setNotes(notesRes.notes || []);
-
-      // Load notebooks
-      const nbRes = await api.getNotebooks({
-        search: searchQuery,
-        subject: selectedSubject
-      });
-      setNotebooks(nbRes.notebooks || []);
-
-    } catch (err) {
+      setBackendStatus('online');
+    } catch (healthErr) {
+      healthOk = false;
       setBackendOnline(false);
-      console.error('Error fetching data from backend:', err);
+      const isTimeout = healthErr.name === 'TimeoutError' || healthErr.message?.includes('timed out');
+      setBackendStatus(isTimeout ? 'cold_start' : 'offline');
+      console.warn('Backend health check unready:', healthErr.message);
       if (isRefresh) {
-        addToast('Could not connect to Flask backend.', 'error');
+        addToast(
+          isTimeout 
+            ? 'Cloud backend is waking up (Render cold start). Auto-reconnecting...' 
+            : 'Could not connect to Flask backend. Please verify your server is running.',
+          'error'
+        );
       }
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
     }
+
+    if (healthOk) {
+      try {
+        const statsRes = await api.getStats();
+        setStats(statsRes.stats || {});
+
+        // Load single notes
+        const notesRes = await api.getNotes({
+          search: searchQuery,
+          tag: selectedTag,
+          favorite: showFavoritesOnly,
+          sortBy: sortBy,
+          order: sortOrder
+        });
+        setNotes(notesRes.notes || []);
+
+        // Load notebooks
+        const nbRes = await api.getNotebooks({
+          search: searchQuery,
+          subject: selectedSubject
+        });
+        setNotebooks(nbRes.notebooks || []);
+      } catch (err) {
+        console.error('Error fetching data from backend:', err);
+      }
+    }
+
+    setLoading(false);
+    setRefreshing(false);
   }, [searchQuery, selectedTag, selectedSubject, showFavoritesOnly, sortBy, sortOrder]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Background Auto-Retry: Polling when backend is offline or waking up
+  useEffect(() => {
+    if (backendOnline) return;
+
+    const intervalId = setInterval(async () => {
+      try {
+        await api.checkHealth({ timeout: 6000 });
+        setBackendOnline(true);
+        setBackendStatus('online');
+        loadData(false);
+      } catch (err) {
+        const isTimeout = err.name === 'TimeoutError' || err.message?.includes('timed out');
+        setBackendStatus(isTimeout ? 'cold_start' : 'offline');
+      }
+    }, 10000); // Check every 10 seconds
+
+    return () => clearInterval(intervalId);
+  }, [backendOnline, loadData]);
 
   // Toggle favorite for note
   const handleToggleFavorite = async (noteId, newStatus) => {
@@ -314,6 +351,8 @@ export default function App() {
         onSignOut={handleSignOut}
         stats={stats}
         backendOnline={backendOnline}
+        backendStatus={backendStatus}
+        onRetryConnection={() => loadData(true)}
         showToast={addToast}
       />
 
@@ -330,6 +369,7 @@ export default function App() {
           onOpenGlobalChat={() => setShowGlobalChat(true)}
           stats={stats}
           backendOnline={backendOnline}
+          backendStatus={backendStatus}
           onRefresh={() => loadData(true)}
           refreshing={refreshing}
         />
@@ -355,10 +395,12 @@ export default function App() {
             <Clock size={18} color="#fbbf24" style={{ flexShrink: 0 }} />
             <div>
               <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#fef3c7' }}>
-                Cloud Backend Waking Up (~30–45s)
+                {backendStatus === 'cold_start' ? 'Cloud Backend Waking Up (~30–45s)' : 'Backend Server Reconnecting'}
               </div>
               <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                Render's free cloud instance enters sleep mode when idle to remain free. Once warmed up, all OCR and RAG responses are instant.
+                {backendStatus === 'cold_start'
+                  ? "Render's free cloud instance enters sleep mode when idle to remain free. Reconnecting automatically..."
+                  : "Could not reach the backend API. If running locally, start it with 'python run.py'. NoteExtract AI is automatically retrying in the background."}
               </div>
             </div>
           </div>

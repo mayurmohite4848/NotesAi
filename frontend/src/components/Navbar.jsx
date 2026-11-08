@@ -19,6 +19,7 @@ export default function Navbar({
   onOpenGlobalChat,
   stats, 
   backendOnline,
+  backendStatus = 'connecting',
   onRefresh,
   refreshing 
 }) {

@@ -3,7 +3,7 @@ import { getSessionToken } from './supabase';
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
 /**
- * Helper to handle fetch responses, Supabase JWT auth injection, and error reporting
+ * Helper to handle fetch responses, Supabase JWT auth injection, timeout, and error reporting
  */
 async function request(url, options = {}) {
   const token = await getSessionToken();
@@ -12,16 +12,32 @@ async function request(url, options = {}) {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE}${url}`, {
-    ...options,
-    headers
-  });
-  const data = await response.json().catch(() => ({}));
-  
-  if (!response.ok) {
-    throw new Error(data.error || `HTTP error ${response.status}`);
+  const { timeout = 15000, ...fetchOptions } = options;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+  try {
+    const response = await fetch(`${API_BASE}${url}`, {
+      ...fetchOptions,
+      headers,
+      signal: fetchOptions.signal || controller.signal
+    });
+    clearTimeout(timeoutId);
+    const data = await response.json().catch(() => ({}));
+    
+    if (!response.ok) {
+      throw new Error(data.error || `HTTP error ${response.status}`);
+    }
+    return data;
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') {
+      const timeoutError = new Error(`Request timed out after ${Math.round(timeout / 1000)}s`);
+      timeoutError.name = 'TimeoutError';
+      throw timeoutError;
+    }
+    throw err;
   }
-  return data;
 }
 
 export const api = {
@@ -34,9 +50,9 @@ export const api = {
     return `${API_BASE}${path}`;
   },
 
-  // Check API status
-  async checkHealth() {
-    return request('/api/health');
+  // Check API status (8s timeout to avoid hanging when cold-starting)
+  async checkHealth(options = {}) {
+    return request('/api/health', { timeout: 8000, ...options });
   },
 
   // Verify Gemini API key with Google AI Studio
@@ -130,7 +146,8 @@ export const api = {
     return request('/api/upload', {
       method: 'POST',
       headers,
-      body: formData
+      body: formData,
+      timeout: 90000
     });
   },
 
@@ -192,7 +209,8 @@ export const api = {
     return request('/api/notebooks/upload-batch', {
       method: 'POST',
       headers,
-      body: formData
+      body: formData,
+      timeout: 120000
     });
   },
 
@@ -400,6 +418,7 @@ export const api = {
     return request(`/api/notebooks/${notebookId}/chat`, {
       method: 'POST',
       headers,
+      timeout: 60000,
       body: JSON.stringify({ 
         message, 
         current_page: currentPage,
@@ -437,6 +456,7 @@ export const api = {
     return request('/api/workspace/chat', {
       method: 'POST',
       headers,
+      timeout: 60000,
       body: JSON.stringify({ message, gemini_api_key: apiKey })
     });
   },

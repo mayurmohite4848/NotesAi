@@ -36,6 +36,8 @@ export default function Sidebar({
   onSignOut,
   stats = {},
   backendOnline = false,
+  backendStatus = 'connecting',
+  onRetryConnection,
   isOpen = true,
   onToggle,
   onCloseMobile,
@@ -374,27 +376,99 @@ export default function Sidebar({
             fontSize: '0.74rem'
           }}>
             <span style={{ color: 'var(--text-dim)', fontWeight: 500 }}>Cloud Engine</span>
-            <span style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '5px',
-              padding: '2px 8px',
-              borderRadius: '999px',
-              fontSize: '0.68rem',
-              fontWeight: 700,
-              background: backendOnline ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
-              border: backendOnline ? '1px solid rgba(16, 185, 129, 0.35)' : '1px solid rgba(245, 158, 11, 0.35)',
-              color: backendOnline ? '#34d399' : '#fbbf24'
-            }}>
+            {backendStatus === 'online' || backendOnline ? (
               <span style={{
-                width: '6px',
-                height: '6px',
-                borderRadius: '50%',
-                background: backendOnline ? '#10b981' : '#f59e0b',
-                boxShadow: backendOnline ? '0 0 6px #10b981' : '0 0 6px #f59e0b'
-              }} />
-              <span>{backendOnline ? 'Render Live' : 'Connecting'}</span>
-            </span>
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '2px 8px',
+                borderRadius: '999px',
+                fontSize: '0.68rem',
+                fontWeight: 700,
+                background: 'rgba(16, 185, 129, 0.15)',
+                border: '1px solid rgba(16, 185, 129, 0.35)',
+                color: '#34d399'
+              }}>
+                <span style={{
+                  width: '6px',
+                  height: '6px',
+                  borderRadius: '50%',
+                  background: '#10b981',
+                  boxShadow: '0 0 6px #10b981'
+                }} />
+                <span>Render Live</span>
+              </span>
+            ) : backendStatus === 'connecting' ? (
+              <span style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '2px 8px',
+                borderRadius: '999px',
+                fontSize: '0.68rem',
+                fontWeight: 700,
+                background: 'rgba(245, 158, 11, 0.15)',
+                border: '1px solid rgba(245, 158, 11, 0.35)',
+                color: '#fbbf24'
+              }}>
+                <Loader2 size={10} className="animate-spin" />
+                <span>Connecting...</span>
+              </span>
+            ) : backendStatus === 'cold_start' ? (
+              <button
+                onClick={onRetryConnection}
+                title="Render cloud instance is waking up (~30-45s). Click to test connection."
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  padding: '2px 8px',
+                  borderRadius: '999px',
+                  fontSize: '0.68rem',
+                  fontWeight: 700,
+                  cursor: onRetryConnection ? 'pointer' : 'default',
+                  background: 'rgba(245, 158, 11, 0.15)',
+                  border: '1px solid rgba(245, 158, 11, 0.35)',
+                  color: '#fbbf24'
+                }}
+              >
+                <span style={{
+                  width: '6px',
+                  height: '6px',
+                  borderRadius: '50%',
+                  background: '#f59e0b',
+                  boxShadow: '0 0 6px #f59e0b'
+                }} />
+                <span>Waking Up (Retry)</span>
+              </button>
+            ) : (
+              <button
+                onClick={onRetryConnection}
+                title="Backend server is unreachable. Click to retry connection."
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  padding: '2px 8px',
+                  borderRadius: '999px',
+                  fontSize: '0.68rem',
+                  fontWeight: 700,
+                  cursor: onRetryConnection ? 'pointer' : 'default',
+                  background: 'rgba(239, 68, 68, 0.15)',
+                  border: '1px solid rgba(239, 68, 68, 0.35)',
+                  color: '#f87171'
+                }}
+              >
+                <span style={{
+                  width: '6px',
+                  height: '6px',
+                  borderRadius: '50%',
+                  background: '#ef4444',
+                  boxShadow: '0 0 6px #ef4444'
+                }} />
+                <span>Offline (Retry)</span>
+              </button>
+            )}
           </div>
 
           {/* Supabase User Profile Card */}

@@ -171,11 +171,15 @@ except ImportError:
     from db import log_llm_telemetry
 
 CANDIDATE_GEMINI_MODELS = [
-    "gemini-3.6-flash",
-    "gemini-3.5-flash",
     "gemini-3.5-flash-lite",
-    "gemini-3.1-pro-preview"
+    "gemini-2.0-flash",
+    "gemini-2.5-flash",
+    "gemini-3.5-flash",
+    "gemini-3.6-flash"
 ]
+
+# In-memory circuit breaker: caches rate-limited models so subsequent pages skip them instantly
+_MODEL_RATE_LIMIT_COOLDOWNS = {}
 
 def transcribe_with_gemini(image_path, api_key=None):
     """
@@ -218,9 +222,12 @@ def transcribe_with_gemini(image_path, api_key=None):
     mime_type = "image/jpeg" if ext in ("jpg", "jpeg") else (f"image/{ext}" if ext else "image/jpeg")
 
     p_tokens = int(len(prompt.split()) * 1.3) + 258  # 258 image tokens estimate
+    now = time.time()
 
     # Method 1: Google GenAI SDK Interactions API
     for model_name in CANDIDATE_GEMINI_MODELS:
+        if model_name in _MODEL_RATE_LIMIT_COOLDOWNS and _MODEL_RATE_LIMIT_COOLDOWNS[model_name] > now:
+            continue
         try:
             from google import genai
 
@@ -254,10 +261,16 @@ def transcribe_with_gemini(image_path, api_key=None):
                 print(f"[OCR] Successfully transcribed with GenAI Interactions API ({model_name}) in {latency_ms}ms!")
                 return result_text
         except Exception as e:
+            err_str = str(e).lower()
+            if "429" in err_str or "rate limit" in err_str or "too_many_requests" in err_str:
+                _MODEL_RATE_LIMIT_COOLDOWNS[model_name] = time.time() + 7200
+                print(f"[OCR] Model {model_name} rate limit reached. Auto-cooling down for 2h.")
             print(f"[OCR] GenAI Interactions ({model_name}) attempt: {e}")
 
     # Method 2: Direct Google AI Studio Interactions REST Endpoint
     for model_name in CANDIDATE_GEMINI_MODELS:
+        if model_name in _MODEL_RATE_LIMIT_COOLDOWNS and _MODEL_RATE_LIMIT_COOLDOWNS[model_name] > now:
+            continue
         try:
             url = "https://generativelanguage.googleapis.com/v1beta/interactions"
             payload = {
@@ -325,6 +338,9 @@ def transcribe_with_gemini(image_path, api_key=None):
         except urllib.error.HTTPError as http_err:
             err_body = http_err.read().decode('utf-8', errors='ignore')
             print(f"[OCR] Interactions REST {model_name} HTTP {http_err.code}: {err_body}")
+            if http_err.code == 429:
+                _MODEL_RATE_LIMIT_COOLDOWNS[model_name] = time.time() + 7200
+                print(f"[OCR] Model {model_name} rate limit (429) hit. Auto-cooling down for 2h.")
         except Exception as rest_err:
             print(f"[OCR] Interactions REST {model_name} error: {rest_err}")
 

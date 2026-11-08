@@ -195,8 +195,8 @@ flowchart TD
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/mayurmohite4848/new.git
-cd new
+git clone https://github.com/mayurmohite4848/NotesAi.git
+cd NotesAi
 ```
 
 ### 2. Universal 1-Command Launcher

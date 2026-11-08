@@ -336,7 +336,9 @@ export default function App() {
       <Sidebar
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(prev => !prev)}
-        onCloseMobile={() => setSidebarOpen(false)}
+        onCloseMobile={() => {
+          if (window.innerWidth < 1024) setSidebarOpen(false);
+        }}
         activeTab={activeTab}
         onChangeTab={(t) => setActiveTab(t)}
         onNewNote={() => setShowManualModal(true)}

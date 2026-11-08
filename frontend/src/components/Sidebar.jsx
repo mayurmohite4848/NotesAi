@@ -82,7 +82,9 @@ export default function Sidebar({
 
   const navItemClick = (action) => {
     if (action) action();
-    if (onCloseMobile) onCloseMobile();
+    if (onCloseMobile && typeof window !== 'undefined' && window.innerWidth < 1024) {
+      onCloseMobile();
+    }
   };
 
   return (

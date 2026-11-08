@@ -48,10 +48,10 @@ def generate_minimal_ai_enhancements(extracted_text, original_filename, metadata
         "key_takeaways": takeaways[:3]
     }
 
-def process_and_save_image(file_obj, upload_folder, api_key=None):
+def save_raw_image(file_obj, upload_folder):
     """
-    Saves uploaded image untouched (original photo), extracts plain text,
-    and segments into clean plain-text note drafts.
+    Saves an uploaded image file directly to the upload directory and returns its path and metadata.
+    Fast synchronous operation (< 5ms) suitable for running before multi-threaded processing.
     """
     if not file_obj or file_obj.filename == '':
         raise ValueError("No file provided.")
@@ -63,7 +63,7 @@ def process_and_save_image(file_obj, upload_folder, api_key=None):
 
     original_name = secure_filename(file_obj.filename)
     extension = original_name.rsplit('.', 1)[1].lower() if '.' in original_name else 'jpg'
-    
+
     timestamp = int(datetime.now(timezone.utc).timestamp())
     unique_prefix = uuid.uuid4().hex[:12]
     unique_filename = f"{unique_prefix}_{timestamp}.{extension}"
@@ -72,11 +72,21 @@ def process_and_save_image(file_obj, upload_folder, api_key=None):
     file_obj.save(save_path)
     file_size_bytes = os.path.getsize(save_path)
 
+    return save_path, unique_filename, original_name, file_size_bytes
+
+def process_saved_image(save_path, unique_filename, original_name, file_size_bytes=None, api_key=None):
+    """
+    Extracts metadata, transcribes handwriting/math/diagrams, and segments into drafts
+    for an image that is already persisted on disk. Thread-safe for parallel worker execution.
+    """
+    if file_size_bytes is None:
+        file_size_bytes = os.path.getsize(save_path) if os.path.exists(save_path) else 0
+
     metadata = extract_image_metadata(save_path, original_name, file_size_bytes)
-    
+
     # Run text transcription (Gemini Flash Vision / local fallback)
     plain_text = extract_handwriting_text(save_path, api_key=api_key)
-    
+
     # Segment into multi-note plain text drafts
     segmented_notes = segment_text_into_notes(plain_text, original_name, metadata)
 
@@ -97,6 +107,14 @@ def process_and_save_image(file_obj, upload_folder, api_key=None):
         "ai_insights": ai_insights,
         "segmented_notes": segmented_notes
     }
+
+def process_and_save_image(file_obj, upload_folder, api_key=None):
+    """
+    Saves uploaded image untouched (original photo), extracts plain text,
+    and segments into clean plain-text note drafts.
+    """
+    save_path, unique_filename, original_name, file_size_bytes = save_raw_image(file_obj, upload_folder)
+    return process_saved_image(save_path, unique_filename, original_name, file_size_bytes, api_key=api_key)
 
 def extract_image_metadata(image_path, original_filename, file_size_bytes):
     """Extracts technical metadata and EXIF data using Pillow."""

@@ -1,6 +1,7 @@
 import os
 import io
 import time
+import concurrent.futures
 from werkzeug.utils import secure_filename
 from flask import Blueprint, request, jsonify, current_app, send_file, Response
 from backend.db import (
@@ -14,7 +15,12 @@ from backend.db import (
     delete_notebook_page,
     reorder_notebook_pages
 )
-from backend.services.image_processor import process_and_save_image, allowed_file
+from backend.services.image_processor import (
+    process_and_save_image,
+    save_raw_image,
+    process_saved_image,
+    allowed_file
+)
 from backend.services.ocr_service import extract_handwriting_text
 from backend.services.pdf_service import generate_notebook_pdf, generate_notebook_markdown, split_pdf_to_images
 
@@ -122,57 +128,98 @@ def upload_notebook_batch():
         first_file.save(pdf_path)
         page_image_paths = split_pdf_to_images(pdf_path, upload_folder)
         
-        for idx, img_path in enumerate(page_image_paths):
+        def transcribe_pdf_page_task(page_tuple):
+            idx, img_path = page_tuple
             p_num = idx + 1
-            print(f"[Notebook Batch] Transcribing PDF page {p_num}/{len(page_image_paths)}...")
+            print(f"[Notebook Batch] Parallel transcribing PDF page {p_num}/{len(page_image_paths)}...")
             transcribed_text = extract_handwriting_text(img_path, api_key=api_key)
-            
             lines = [l.strip() for l in (transcribed_text or "").split('\n') if l.strip()]
             p_title = lines[0].lstrip('#-• ').strip() if lines else f"Page {p_num}"
             if len(p_title) > 40:
                 p_title = p_title[:37] + "..."
+            return {
+                "page_number": p_num,
+                "title": p_title or f"Page {p_num}",
+                "content": transcribed_text or f"Page {p_num} notes.",
+                "extracted_text": transcribed_text,
+                "image_filename": os.path.basename(img_path),
+                "image_path": f"/api/uploads/{os.path.basename(img_path)}"
+            }
 
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+            pdf_results = list(executor.map(transcribe_pdf_page_task, enumerate(page_image_paths)))
+
+        for p_data in sorted(pdf_results, key=lambda x: x["page_number"]):
             page = add_notebook_page(
                 notebook_id=notebook_id,
-                page_number=p_num,
-                title=p_title or f"Page {p_num}",
-                content=transcribed_text or f"Page {p_num} notes.",
-                extracted_text=transcribed_text,
-                image_filename=os.path.basename(img_path),
-                image_path=f"/api/uploads/{os.path.basename(img_path)}"
+                page_number=p_data["page_number"],
+                title=p_data["title"],
+                content=p_data["content"],
+                extracted_text=p_data["extracted_text"],
+                image_filename=p_data["image_filename"],
+                image_path=p_data["image_path"]
             )
             processed_pages.append(page)
-            time.sleep(0.3)
     else:
-        # Multi-image uploads
+        # Multi-image uploads: 1. Save all raw files to disk first (fast, thread-safe)
+        saved_items = []
         for idx, f in enumerate(files):
             if not f or not f.filename or not allowed_file(f.filename):
                 continue
-            
-            p_num = idx + 1
-            print(f"[Notebook Batch] Processing image {p_num}/{len(files)}: {f.filename}...")
-            
-            processed = process_and_save_image(f, upload_folder, api_key=api_key)
+            save_path, unique_fn, orig_name, file_sz = save_raw_image(f, upload_folder)
+            saved_items.append({
+                "page_number": idx + 1,
+                "save_path": save_path,
+                "unique_filename": unique_fn,
+                "original_name": orig_name,
+                "file_size_bytes": file_sz
+            })
+
+        # 2. Transcribe pages in parallel (capped at 2 workers for free tier RAM/RPM safety)
+        def process_image_page_task(item):
+            p_num = item["page_number"]
+            print(f"[Notebook Batch] Parallel processing image {p_num}/{len(saved_items)}: {item['original_name']}...")
+            processed = process_saved_image(
+                save_path=item["save_path"],
+                unique_filename=item["unique_filename"],
+                original_name=item["original_name"],
+                file_size_bytes=item["file_size_bytes"],
+                api_key=api_key
+            )
             transcribed_text = processed.get("extracted_text", "")
-            
             lines = [l.strip() for l in (transcribed_text or "").split('\n') if l.strip()]
             p_title = lines[0].lstrip('#-• ').strip() if lines else f"Page {p_num}"
             if len(p_title) > 40:
                 p_title = p_title[:37] + "..."
 
+            return {
+                "page_number": p_num,
+                "title": p_title or f"Page {p_num}",
+                "content": transcribed_text or f"Notes digitized from {item['original_name']}.",
+                "extracted_text": transcribed_text,
+                "image_filename": processed["filename"],
+                "image_path": f"/api/uploads/{processed['filename']}",
+                "image_metadata": processed.get("metadata"),
+                "ai_summary": processed.get("ai_insights")
+            }
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+            image_results = list(executor.map(process_image_page_task, saved_items))
+
+        # 3. Insert into SQLite in strictly sequential page order
+        for p_data in sorted(image_results, key=lambda x: x["page_number"]):
             page = add_notebook_page(
                 notebook_id=notebook_id,
-                page_number=p_num,
-                title=p_title or f"Page {p_num}",
-                content=transcribed_text or f"Notes digitized from {f.filename}.",
-                extracted_text=transcribed_text,
-                image_filename=processed["filename"],
-                image_path=f"/api/uploads/{processed['filename']}",
-                image_metadata=processed.get("metadata"),
-                ai_summary=processed.get("ai_insights")
+                page_number=p_data["page_number"],
+                title=p_data["title"],
+                content=p_data["content"],
+                extracted_text=p_data["extracted_text"],
+                image_filename=p_data["image_filename"],
+                image_path=p_data["image_path"],
+                image_metadata=p_data.get("image_metadata"),
+                ai_summary=p_data.get("ai_summary")
             )
             processed_pages.append(page)
-            time.sleep(0.3)
 
     full_notebook = get_notebook_by_id(notebook_id, include_pages=True)
     return jsonify({
@@ -203,47 +250,90 @@ def add_page(notebook_id):
             pdf_path = os.path.join(upload_folder, secure_filename(files[0].filename))
             files[0].save(pdf_path)
             page_image_paths = split_pdf_to_images(pdf_path, upload_folder)
-            for idx, img_path in enumerate(page_image_paths):
+
+            def transcribe_add_pdf_task(page_tuple):
+                idx, img_path = page_tuple
                 transcribed_text = extract_handwriting_text(img_path, api_key=api_key)
                 lines = [l.strip() for l in (transcribed_text or "").split('\n') if l.strip()]
-                p_title = lines[0].lstrip('#-• ').strip() if lines else f"New Page"
+                p_title = lines[0].lstrip('#-• ').strip() if lines else f"New Page {idx + 1}"
                 if len(p_title) > 40:
                     p_title = p_title[:37] + "..."
+                return {
+                    "order": idx,
+                    "title": p_title,
+                    "content": transcribed_text or "New page notes.",
+                    "extracted_text": transcribed_text,
+                    "image_filename": os.path.basename(img_path),
+                    "image_path": f"/api/uploads/{os.path.basename(img_path)}"
+                }
 
+            with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+                pdf_results = list(executor.map(transcribe_add_pdf_task, enumerate(page_image_paths)))
+
+            for p_data in sorted(pdf_results, key=lambda x: x["order"]):
                 page = add_notebook_page(
                     notebook_id=notebook_id,
-                    title=p_title,
-                    content=transcribed_text or "New page notes.",
-                    extracted_text=transcribed_text,
-                    image_filename=os.path.basename(img_path),
-                    image_path=f"/api/uploads/{os.path.basename(img_path)}"
+                    title=p_data["title"],
+                    content=p_data["content"],
+                    extracted_text=p_data["extracted_text"],
+                    image_filename=p_data["image_filename"],
+                    image_path=p_data["image_path"]
                 )
                 added_pages.append(page)
-                time.sleep(0.3)
         else:
             # Multi or single image files
-            for f in files:
+            saved_items = []
+            for idx, f in enumerate(files):
                 if not f or not f.filename or not allowed_file(f.filename):
                     continue
-                processed = process_and_save_image(f, upload_folder, api_key=api_key)
+                save_path, unique_fn, orig_name, file_sz = save_raw_image(f, upload_folder)
+                saved_items.append({
+                    "order": idx,
+                    "save_path": save_path,
+                    "unique_filename": unique_fn,
+                    "original_name": orig_name,
+                    "file_size_bytes": file_sz
+                })
+
+            def transcribe_add_image_task(item):
+                processed = process_saved_image(
+                    save_path=item["save_path"],
+                    unique_filename=item["unique_filename"],
+                    original_name=item["original_name"],
+                    file_size_bytes=item["file_size_bytes"],
+                    api_key=api_key
+                )
                 transcribed_text = processed.get("extracted_text", "")
                 lines = [l.strip() for l in (transcribed_text or "").split('\n') if l.strip()]
                 p_title = lines[0].lstrip('#-• ').strip() if lines else f"New Page"
                 if len(p_title) > 40:
                     p_title = p_title[:37] + "..."
+                return {
+                    "order": item["order"],
+                    "title": p_title,
+                    "content": transcribed_text or f"Notes digitized from {item['original_name']}.",
+                    "extracted_text": transcribed_text,
+                    "image_filename": processed["filename"],
+                    "image_path": f"/api/uploads/{processed['filename']}",
+                    "image_metadata": processed.get("metadata"),
+                    "ai_summary": processed.get("ai_insights")
+                }
 
+            with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+                image_results = list(executor.map(transcribe_add_image_task, saved_items))
+
+            for p_data in sorted(image_results, key=lambda x: x["order"]):
                 page = add_notebook_page(
                     notebook_id=notebook_id,
-                    title=p_title,
-                    content=transcribed_text or f"Notes digitized from {f.filename}.",
-                    extracted_text=transcribed_text,
-                    image_filename=processed["filename"],
-                    image_path=f"/api/uploads/{processed['filename']}",
-                    image_metadata=processed.get("metadata"),
-                    ai_summary=processed.get("ai_insights")
+                    title=p_data["title"],
+                    content=p_data["content"],
+                    extracted_text=p_data["extracted_text"],
+                    image_filename=p_data["image_filename"],
+                    image_path=p_data["image_path"],
+                    image_metadata=p_data.get("image_metadata"),
+                    ai_summary=p_data.get("ai_summary")
                 )
                 added_pages.append(page)
-                time.sleep(0.3)
     else:
         data = request.get_json() or {}
         page = add_notebook_page(

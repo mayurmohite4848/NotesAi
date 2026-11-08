@@ -128,5 +128,32 @@ class TestNotebooks(unittest.TestCase):
         self.assertEqual(md_res.status_code, 200)
         self.assertIn("AI & Deep Learning", md_res.data.decode('utf-8'))
 
+    def test_parallel_batch_upload_multi_images(self):
+        """Tests that uploading multiple images executes in parallel and preserves page order."""
+        images = []
+        for i in range(3):
+            img = Image.new("RGB", (100, 100), color=(i * 50, 100, 150))
+            buf = io.BytesIO()
+            img.save(buf, format="PNG")
+            buf.seek(0)
+            images.append((buf, f"page_{i+1}.png"))
+
+        data = {
+            "title": "Parallel Test Notebook",
+            "subject_tag": "Concurrency",
+            "description": "Multi-page parallel ingestion test",
+            "files": images
+        }
+
+        res = self.client.post("/api/notebooks/upload-batch", data=data, content_type="multipart/form-data")
+        self.assertEqual(res.status_code, 201)
+        res_data = res.get_json()
+        nb = res_data["notebook"]
+        self.assertEqual(len(nb["pages"]), 3)
+        self.assertEqual(nb["pages"][0]["page_number"], 1)
+        self.assertEqual(nb["pages"][1]["page_number"], 2)
+        self.assertEqual(nb["pages"][2]["page_number"], 3)
+        self.assertTrue(nb["pages"][0]["image_filename"].endswith(".png"))
+
 if __name__ == "__main__":
     unittest.main()

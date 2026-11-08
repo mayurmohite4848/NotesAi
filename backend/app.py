@@ -81,6 +81,16 @@ def create_app(test_config=None):
     def serve_upload(filename):
         return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
 
+    # Cloud platform root & health check aliases
+    @app.route("/", methods=["GET"])
+    @app.route("/healthz", methods=["GET"])
+    def root_health():
+        return jsonify({
+            "status": "healthy",
+            "service": "NoteExtract AI Backend",
+            "health_endpoint": "/api/health"
+        }), 200
+
     # Health check endpoint
     @app.route("/api/health", methods=["GET"])
     def health_check():
